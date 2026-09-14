@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-orchestrator-role.sh",
+            "$comment": "Loads load-orchestrator-role.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-orchestrator-protocol.sh",
+            "$comment": "Loads load-orchestrator-protocol.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-orchestrator-cards.sh",
+            "$comment": "Loads load-orchestrator-cards.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-agent-comms.sh",
+            "$comment": "Loads load-agent-comms.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-fail-open.sh",
+            "$comment": "Loads audit-fail-open.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-status-digest.sh",
+            "$comment": "Loads load-status-digest.sh at session start."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-destructive-bash.sh",
+            "$comment": "Guard: block-destructive-bash.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deny-direct-trello-api.sh",
+            "$comment": "Guard: deny-direct-trello-api.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/precompact-write-handoff.sh",
+            "$comment": "Blocks auto-compaction until today's handoff is written."
+          }
+        ]
+      }
+    ]
+  }
+}

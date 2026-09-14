@@ -1,0 +1,185 @@
+{
+  "$description": "Role-scoped hooks for the Dev agent. Loaded when a Claude Code session starts in this folder.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "$comment": "Preload Dev_Role.md (role briefing) in full. Dumb file loader \u2014 reads the file as-is and emits via additionalContext. The app CLAUDE.md is in a sibling tree off the walk-up path and is NOT auto-loaded; Read it explicitly when working on app code.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-dev-role.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload Dev_Protocol.md (pre-implementation methodology \u2014 verify research, registry, todos) in full. Dumb file loader.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-dev-protocol.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload Dev_Standards.md (implementation standards + anti-patterns) in full. Dumb file loader.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-dev-standards.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload Dev_Cards.md (DoD, Implementation Notes format, Clarification Protocol, Partial Completion) in full. Dumb file loader.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-dev-cards.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload Dev_Build.md (\u00a74 Build Verification, \u00a710 Git Push Workflow, Hotfix Protocol) in full. Dumb file loader. \u00a73 Database Changes was split out to Dev_Database.md (load-dev-database.sh) to keep this under the ~10K-char additionalContext cap.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-dev-build.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "States that peers are reached with ListAgents and SendMessage.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-agent-comms.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Surface the dev role's Trello column queue ('Now') at session start, plus a soft-start suggestion for `/loop /check-trello 300s`. This hook never queries Trello \u2014 it only emits the reminder string; the actual column query happens in `/check-trello`, resolved by name across the board ids in the walk-down project CLAUDE.md Trello section (never the global MCP active board). Fail-open: missing jq \u2192 silent.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-dev-trello-catchup.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Audit every sibling hook for static fail-open conditions at session start. Discovers hooks by globbing the same directory, parses each one's `# Requires:` and `# Environment:` header lines, and validates declared CLI tools and env vars against the current shell. If any hook would silently allow tool calls because its declared preconditions are unmet, emits a loud banner (stderr + additionalContext) listing every affected hook and what's missing. Stays silent when all hooks are healthy. Agnostic \u2014 depends only on the header convention, no hardcoded hook names \u2014 so it travels with the role template into any new project.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-fail-open.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Surface session-start doc loader status \u2014 which docs were inlined in full vs. which overflowed Claude Code's ~10K-char additionalContext cap and got persisted as a file (where the harness substitutes only a ~2KB preview, silently turning a session-start doc into a pointer). The cap itself is a harness constraint; this digest is agent-authored to make its consequence visible at every session start. Discovers doc loaders by globbing load-dev-*.sh, excluding the catchup hooks and the digest itself; re-runs each in a subshell and measures the real emitted body. Must run last so its output appears at the bottom of session-start context. Fail-open on missing jq.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-status-digest.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "$comment": "Destructive actions. Blocks `killall node` and `git push --force` without --force-with-lease.",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-destructive-bash.sh",
+            "$comment": "Destructive actions. Blocks `killall node` (reaches every Node process on the machine, not just the target) and `git push --force` without --force-with-lease. A plain `git push` is NOT blocked for Dev. Exit 2 with the safe alternative on stderr."
+          }
+        ]
+      },
+      {
+        "$comment": "Needs-research labeler. On mcp__trello__move_card to Research and prep (the clarification-back flow), apply the blue 'Needs research' label. Non-blocking; informational side-effect only.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/apply-needs-research-label.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Column-scope gate. Blocks mcp__trello__update_card_details when the card's current list is not 'Now'. Backstop for Dev_Role.md \u00a7 Card Management \u00a7 Hard Constraints \u2014 Column scope. Fail-open on missing jq/curl/env.",
+        "matcher": "mcp__trello__update_card_details",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gate-column-scope.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Description-write block. Denies any mcp__trello__update_card_details call where tool_input.description is set. The card description is Research's evidence chain; Dev writes only to comments via mcp__trello__add_comment per Dev_Protocol.md \u00a76. update_card_details replaces description wholesale, so any Dev write to that field destroys Research's record. Backstop for Dev_Role.md \u00a7 Card Management \u00a7 Hard Constraints \u2014 Comments, never description.",
+        "matcher": "mcp__trello__update_card_details",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-description-writes.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Implementation Notes gate. On mcp__trello__move_card to 'Ready for QA', fetches the card's most-recent comment and validates it against the Dev_Protocol.md \u00a76 template (## Implementation Notes header + ### Services Used, Testing Done, Deviations from Research subsections). Blocks the move if no comments exist, or any required section is missing, or sections are filled only with template placeholders. Implementation Notes go in comments \u2014 the description is Research's, not Dev's. Fail-open on missing jq/curl/env or API failure.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gate-implementation-notes.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Per-card commit gate. On mcp__trello__move_card to 'Ready for QA', validates that the most-recent commit on the app repo's HEAD has a subject starting with #<card-number>. Enforces Dev_Protocol.md \u00a75 per-card commit discipline (the lesson captured in feedback_per_card_commits.md memory). The discipline is what lets \u00a76 drop Files Modified \u2014 QA finds the diff via `git log --grep='#<card>'` instead of reading a re-narration. Fail-open on missing tools/env/repo.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gate-per-card-commit.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Deny direct Trello API calls from Bash. Every other Trello gate in this directory matches on mcp__trello__* tool names, so a curl/wget to api.trello.com bypasses them entirely. Closes that gap at the Bash tool layer. Hook scripts calling the Trello API are unaffected (invoked by Claude Code, not via Bash).",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deny-direct-trello-api.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "$comment": "When a card moves to Ready for QA, surface what's left in Now so Dev picks up the next card promptly.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-now-on-ready-for-qa.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "$comment": "Handoff gate on compaction. Matcher manual|auto \u2014 BOTH paths: the context-wall freeze ends in a manual /compact, which would otherwise be the one ungated door. Blocks unless handoffs/dev-handoff-YYYY-MM-DD.md exists for today AND was written within FRESHNESS_SECONDS (existence alone let a morning handoff satisfy an evening compaction). Fails open on missing $CLAUDE_PROJECT_DIR, missing handoffs dir, or an unstattable file.",
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/precompact-write-handoff.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

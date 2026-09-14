@@ -1,0 +1,227 @@
+{
+  "$description": "Role-scoped hooks for the QA agent. Loaded when a Claude Code session starts in this folder.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "$comment": "Done-immutable gate. Fires on update_card_details; denies the edit only when the target card is currently in 'Done' (case-insensitive). Cards in 'Done' are the QA-blessed final record of what shipped. The broader description-clobber concern is covered by the sibling block-description-writes.sh hook, which denies any update_card_details with tool_input.description set in every column. With descriptions locked everywhere, name/label/dueDate edits are allowed in non-Done columns \u2014 this is what unblocks the tracking-card naming convention's post-create rename in 'Research and prep'.",
+        "matcher": "mcp__trello__update_card_details",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gate-done-immutable.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Description-write block. Denies any mcp__trello__update_card_details call where tool_input.description is set. The card description is Research's evidence chain; QA writes review results to comments via mcp__trello__add_comment per the \u00a79 QA Comment template. Tracking-card creation is unaffected \u2014 QA creates tracking cards via mcp__trello__add_card_to_list, which is a different tool not gated by this hook. Backstop for QA_Role.md \u00a7 Card Management \u00a7 Hard Constraints \u2014 Comments, never description.",
+        "matcher": "mcp__trello__update_card_details",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-description-writes.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Card naming convention backstop. Fires on add_card_to_list (create) and update_card_details (rename). If the candidate name starts with `#`, validate the full convention (#<idShort> <title> <24-hex trello_api_id>, three parts for every role, optional trailing suffix). Inconsistent names break board-wide search; the convention is prose-only otherwise.",
+        "matcher": "mcp__trello__(update_card_details|add_card_to_list)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/enforce-card-naming.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "QA protocol compliance (pre-move). Backstop on mcp__trello__move_card from 'Ready for QA'. Validates the latest QA review comment against QA_Decisions.md \u00a79 template across four destinations: Done (PASS), Now (FAIL), Research or Design (BOUNCE). On FAIL \u2192 Now applies the red label; on PASS \u2192 Done removes the red label and applies (or creates) the purple 'QA complete' label. BOUNCE \u2192 Research and prep makes no label change \u2014 the destination column is the routing signal. Label side-effects non-fatal. Exit 2 blocks the move on validation failure.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/qa-protocol-compliance.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Freshness check (pre-move). Denies move_card from 'Ready for QA' when the card has Dev-side activity (new '## Implementation Notes' comment or description edit) newer than the latest '## QA Review' comment. Catches stale-state review where Dev re-handoffs after QA wrote their assessment, leaving QA to PASS or FAIL the wrong code.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/qa-freshness-check.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Required-fixes coverage (pre-move). Denies move_card from 'Ready for QA' to 'Done' on iteration \u2265 2 unless the latest QA review includes a '### Iteration N Fixes Addressed' section with at least as many enumerated items as the prior FAIL's Required Fixes section. Catches the iteration-2-without-fixes failure mode where Dev re-handoffs in seconds and QA rubber-stamps PASS without verifying each prior fix.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/qa-required-fixes-coverage.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Deferral-phrase surfacer (pre-comment). Denies mcp__trello__add_comment when the body starts with '## QA Review' (the \u00a79 template signature) AND contains a deferral phrase ('non-blocking note', 'minor gap', 'fold into next pass', 'out of scope', 'follow-on', 'future work observation', etc.) on a line that lacks a #<n> tracking-card citation. Codifies the QA memory rule that every finding gets a tracked card before the QA comment goes up.",
+        "matcher": "mcp__trello__add_comment",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/qa-deferral-phrase-surfacer.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Deny direct Trello API calls from Bash. Other hooks in this folder match on mcp__trello__* tool names; shelling out via Bash bypasses them. This hook rejects the bypass at the Bash layer.",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deny-direct-trello-api.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "PASS-evidence gate. Catches the rubber-stamp PASS: a card moved QA\u2192Done on a green-looking diff without confirming the deliverable exists and functions. Every PASS\u2192Done move must carry a \"### Verification\" section with real runtime/existence evidence (a command run, a portal rendered in, a row/path confirmed) OR an explicit justified N/A. A bare file:line citation does NOT satisfy it \u2014 citations are not verification.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/qa-pass-evidence-gate.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "$comment": "QA post-move queue surface. Fires after mcp__trello__move_card succeeds with destination Done or Now. Queries Ready for QA and emits the remaining queue via additionalContext so the session picks up the next card without having to ask. For each queued card, also fetches the latest comment whose body starts with '## Implementation Notes' and inlines a short preview alongside the card title \u2014 Dev's implementation notes are the load-bearing input for QA review (disclosed adaptations, deviations, files-modified inventory). Cards with no Implementation Notes comment are flagged with \u2717 so the absence is visible at queue-display time rather than discovered mid-review.",
+        "matcher": "mcp__trello__move_card",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/qa-post-move.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Tracking card labeler. Fires after mcp__trello__add_card_to_list succeeds; applies the orange 'Tracking' label to the newly-created card. QA creates cards only as tracking cards for findings surfaced during review. Non-blocking; informational side-effect only.",
+        "matcher": "mcp__trello__add_card_to_list",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/apply-tracking-label.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "$comment": "Preload QA_Role.md via additionalContext. Split from the original single-hook bundle because the combined payload exceeded Claude Code's documented 10,000-char additionalContext cap (https://code.claude.com/docs/en/hooks), which caused the harness to persist the payload and substitute a ~2KB preview.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-role.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload protocol/QA_Hooks.md (the hook-enforced constraints) via additionalContext. Split out of QA_Role.md when that doc crossed the ~10K additionalContext cap \u2014 the seam is role identity vs enforcement machinery. Counted by load-status-digest.sh like any other doc loader.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-hooks.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload protocol/QA_Checks.md (the seven review checks: build verification, code first, service bypass, security, compliance, data integrity, error handling, acceptance criteria). Dumb file loader \u2014 protocol split semantically across four files, one loader per file. load-status-digest.sh surfaces overflow at session start; if a file ever crosses the cap the fix is a further semantic split, never byte-range slicing.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-checks.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-surface.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload protocol/QA_Decisions.md (decision matrix and \u00a79 comment template).",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-decisions.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload protocol/QA_Workflow.md (unit testing, iteration, hotfix, team composition, E2E, what NOT to flag, documentation outputs).",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-workflow.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Preload protocol/QA_Coordination.md (card naming convention).",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-coordination.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "States that peers are reached with ListAgents and SendMessage.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-agent-comms.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Surface the qa role's Trello column queue ('Ready for QA') at session start, plus a soft-start suggestion for `/loop /check-trello 300s`. This hook never queries Trello \u2014 it only emits the reminder string; the actual column query happens in `/check-trello`, resolved by name across the board ids in the walk-down project CLAUDE.md Trello section (never the global MCP active board). Fail-open: missing jq \u2192 silent.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-trello-catchup.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Audit every sibling hook for static fail-open conditions at session start. Discovers hooks by globbing the same directory, parses each one's `# Requires:` and `# Environment:` header lines, and validates declared CLI tools and env vars against the current shell. If any hook would silently allow tool calls because its declared preconditions are unmet, emits a loud banner (stderr + additionalContext) listing every affected hook and what's missing. Stays silent when all hooks are healthy. Agnostic \u2014 depends only on the header convention, no hardcoded hook names \u2014 so it travels with the role template into any new project.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-fail-open.sh"
+          }
+        ]
+      },
+      {
+        "$comment": "Doc loader status digest. Runs LAST in SessionStart so its output appears at the bottom of the session-start context. Globs load-qa-*.sh, excludes catchups (bus, trello) and itself, re-runs each remaining loader in a subshell, measures the actually emitted additionalContext payload (wc -m / chars), and prints OK / WARN. The harness silently persists over-cap content as a file with only a ~2KB preview inlined; this digest makes any such overflow visible at session start so the regression cannot hide behind a normal-looking system reminder. Fix overflow by splitting the source doc at semantic boundaries \u2014 never by reintroducing byte-range slicing.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-status-digest.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "$comment": "Handoff gate on compaction. Matcher manual|auto \u2014 BOTH paths: the context-wall freeze ends in a manual /compact, which would otherwise be the one ungated door. Blocks unless handoffs/qa-handoff-YYYY-MM-DD.md exists for today AND is fresh. Fails open on missing $CLAUDE_PROJECT_DIR, missing handoffs dir, or an unstattable file.",
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/precompact-write-handoff.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

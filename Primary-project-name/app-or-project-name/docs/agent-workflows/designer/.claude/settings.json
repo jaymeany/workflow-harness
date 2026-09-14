@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-designer-role.sh",
+            "$comment": "Loads load-designer-role.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-designer-protocol.sh",
+            "$comment": "Loads load-designer-protocol.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-designer-craft.sh",
+            "$comment": "Loads load-designer-craft.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-designer-cards.sh",
+            "$comment": "Loads load-designer-cards.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-agent-comms.sh",
+            "$comment": "Loads load-agent-comms.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-designer-trello-catchup.sh",
+            "$comment": "Loads load-designer-trello-catchup.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-fail-open.sh",
+            "$comment": "Loads audit-fail-open.sh at session start."
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-status-digest.sh",
+            "$comment": "Loads load-status-digest.sh at session start."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-destructive-bash.sh",
+            "$comment": "Guard: block-destructive-bash.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/gate-column-scope.sh",
+            "$comment": "Guard: gate-column-scope.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-description-writes.sh",
+            "$comment": "Guard: block-description-writes.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/deny-direct-trello-api.sh",
+            "$comment": "Guard: deny-direct-trello-api.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/precompact-write-handoff.sh",
+            "$comment": "Blocks auto-compaction until today's handoff is written."
+          }
+        ]
+      }
+    ]
+  }
+}
