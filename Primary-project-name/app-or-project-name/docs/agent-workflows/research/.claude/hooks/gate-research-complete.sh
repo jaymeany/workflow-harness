@@ -2,36 +2,33 @@
 #
 # gate-research-complete.sh — Claude Code PreToolUse hook
 #
-# Three responsibilities:
+# Two flows:
 #
-# 1. On `mcp__trello__move_card` to a "Now" list: verify the card has a
-#    "## Research Complete" marker and no unresolved blockers. Block the
-#    move if the gate fails. Attach a green "Research complete" label on
-#    pass.
+# 1. Update (the canonical handoff). When an update attaches the "Research
+#    complete" label, the card must qualify. A qualifying card advances from
+#    Research's column to Now; a card that does not qualify is denied. An
+#    update that does not attach the label has no side effect.
 #
-# 2. On `mcp__trello__update_card_details` where the new description
-#    qualifies as research-complete (marker present, no blocker tags, no
-#    unresolved `## Open Questions`): attach the green "Research complete"
-#    label so the card is visually marked on the board. Never blocks — the
-#    label-on-save path is best-effort.
+# 2. Move to the Now column: verify the card has a "## Research Complete"
+#    marker and no unresolved blockers. Block the move if the gate fails.
+#    Attach the "Research complete" label on pass.
 #
-# 3. On `mcp__trello__update_card_details` where `tool_input.labels`
-#    includes the Research-complete label id: deny the update if the
-#    post-update description does not qualify. Closes the bypass where an
-#    agent attaches the label directly via the labels field instead of
-#    earning it through the description.
+# Board access, tool names and the column rule come from the board layer,
+# loaded through lib.sh.
 #
-# Matcher in settings.json: "mcp__trello__(move_card|update_card_details)"
+# Matcher in settings.json: the board's move and update tools.
 #
 # Environment:
 #   TRELLO_API_KEY — required
 #   TRELLO_API_TOKEN or TRELLO_TOKEN — required (either name accepted)
 #
 # Requires: jq, curl
+# Requires-Path: ../board/board.sh
+# Board-Actions: move, update
 #
 # Exit codes:
 #   0 — allow
-#   2 — deny with stderr message (move_card gate only)
+#   2 — deny with stderr message
 
 set -euo pipefail
 
@@ -40,59 +37,56 @@ if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
 fi
 
 # Shared helpers: evaluate_research_complete, attach_research_complete_label,
-# find_research_complete_label_id. See lib.sh for criteria + behavior.
+# find_research_complete_label_id, advance_card_to_now. lib.sh also loads the
+# board layer.
 # shellcheck disable=SC1091
 source "$(dirname "$0")/lib.sh"
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
-
-case "$tool_name" in
-  mcp__trello__move_card|mcp__trello__update_card_details) ;;
+hook_read_action
+case "$HOOK_ACTION" in
+  move|update) ;;
   *) exit 0 ;;
 esac
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
+board_credentials_present || exit 0
 
 # ============================================================================
-# Flow A: update_card_details
+# Flow A: update
 #
 # Two enforcement roles:
-#   1. Deny any update that tries to attach the green "Research complete" label
-#      to a card whose (post-update) description does NOT qualify as
-#      research-complete. Prevents bypassing the gate by manually setting
-#      tool_input.labels = [research_complete_label_id].
-#   2. When a description is being set AND qualifies, auto-attach the label
-#      (non-blocking label-on-save).
+#   1. Deny any update that tries to attach the "Research complete" label to a
+#      card whose (post-update) description does NOT qualify as
+#      research-complete. Prevents bypassing the gate by setting the label
+#      directly in the update's labels.
+#   2. When the card qualifies, advance it to Now.
 # ============================================================================
 
-if [[ "$tool_name" == "mcp__trello__update_card_details" ]]; then
-  card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
+if [[ "$HOOK_ACTION" == "update" ]]; then
+  card_id="$HOOK_CARD_ID"
   if [[ -z "$card_id" ]]; then
     exit 0
   fi
 
-  new_desc=$(echo "$input" | jq -r '.tool_input.description // empty')
+  new_desc="$HOOK_DESCRIPTION"
   has_desc_update=0
   [[ -n "$new_desc" ]] && has_desc_update=1
 
-  # Lookup the board-level green "Research complete" label id for this card's board.
-  board_id=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idBoard&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null | jq -r '.idBoard // empty')
+  # Look up the board's "Research complete" label id for this card's board.
+  board_card_get card "$card_id"
+  board_id=""
+  if [[ -n "$card" ]]; then
+    board_id=$(printf '%s' "$card" | jq -r '.board_id // empty')
+  fi
   research_label_id=""
   if [[ -n "$board_id" ]]; then
     research_label_id=$(find_research_complete_label_id "$board_id")
   fi
 
-  # Does tool_input.labels (if present) include the Research Complete label id?
+  # Do the update's labels include the Research complete label id?
   adding_research_label=0
-  if [[ -n "$research_label_id" ]]; then
-    labels_in_input=$(echo "$input" | jq -r --arg rid "$research_label_id" '(.tool_input.labels // []) | index($rid) // empty')
-    if [[ -n "$labels_in_input" ]]; then
-      adding_research_label=1
-    fi
+  if [[ -n "$research_label_id" ]] && printf '%s\n' "$HOOK_LABEL_IDS" | grep -qxF "$research_label_id"; then
+    adding_research_label=1
   fi
 
   # The "Research complete" label is the SINGLE handoff trigger. A content-only
@@ -108,12 +102,14 @@ if [[ "$tool_name" == "mcp__trello__update_card_details" ]]; then
 
   # Evaluate the incoming description if this update bundles one, else the
   # card's current description. evaluate_research_complete is unified with
-  # gate-card-structure (it now also checks the required sections), so a card
-  # that another gate would reject on structure also fails here — no split-brain.
+  # gate-card-structure (it also checks the required sections), so a card
+  # that another gate would reject on structure also fails here.
   desc_to_check="$new_desc"
   if [[ "$has_desc_update" == "0" ]]; then
-    current=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=desc&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-    desc_to_check=$(echo "$current" | jq -r '.desc // empty')
+    desc_to_check=""
+    if [[ -n "$card" ]]; then
+      desc_to_check=$(printf '%s' "$card" | jq -r '.description // empty')
+    fi
   fi
 
   status=$(evaluate_research_complete "$desc_to_check")
@@ -135,39 +131,41 @@ EOF
     exit 2
   fi
 
-  # Qualifies: advance Research's column -> "Now". The tool call then attaches
-  # the label. This hook is registered LAST among PreToolUse entries, so
-  # gate-column-scope has already confirmed the card is in Research's column
-  # and passed; no later hook can deny this call, so the advance is safe.
+  # Qualifies: advance Research's column to Now. The tool call then attaches
+  # the label.
   advance_card_to_now "$card_id"
   exit 0
 fi
 
 # ============================================================================
-# Flow B: move_card — gate enforcement + label on pass
+# Flow B: move — gate enforcement + label on pass
 # ============================================================================
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-dest_list_id=$(echo "$input" | jq -r '.tool_input.listId // empty')
+card_id="$HOOK_CARD_ID"
+dest_list_id="$HOOK_DEST_STAGE_ID"
 if [[ -z "$card_id" || -z "$dest_list_id" ]]; then
   exit 0
 fi
 
-# Only gate moves to a list named "Now" (case-insensitive). Matching by
-# name instead of hardcoded ID so the hook works across the main board
-# and any feature-worktree boards that share the same column naming.
-dest_list=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${dest_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '{}')
-dest_name=$(echo "$dest_list" | jq -r '.name // empty')
+# Only gate moves to the Now column, found by name with the column rule.
+board_stage_get dest_list "$dest_list_id"
+dest_name=""
+if [[ -n "$dest_list" ]]; then
+  dest_name=$(printf '%s' "$dest_list" | jq -r '.name // empty')
+fi
 if [[ -z "$dest_name" ]]; then
   exit 0
 fi
-if ! echo "$dest_name" | grep -qiE '^now$'; then
+if ! board_column_is "$dest_name" now; then
   exit 0
 fi
 
 # Fetch the card's current description.
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=desc&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '{}')
-desc=$(echo "$card" | jq -r '.desc // empty')
+board_card_get card "$card_id"
+desc=""
+if [[ -n "$card" ]]; then
+  desc=$(printf '%s' "$card" | jq -r '.description // empty')
+fi
 status=$(evaluate_research_complete "$desc")
 
 case "$status" in

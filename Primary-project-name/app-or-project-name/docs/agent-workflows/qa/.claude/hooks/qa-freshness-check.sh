@@ -45,52 +45,61 @@
 # legitimate moves on a tooling gap) is worse than letting an edit
 # through. Same posture as the other hooks in this folder.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
+hook_read_action
+if [[ "$HOOK_ACTION" != "move" ]]; then
   exit 0
 fi
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
+card_id="$HOOK_CARD_ID"
 if [[ -z "$card_id" ]]; then
   exit 0
 fi
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
+board_credentials_present || exit 0
 
-# Resolve source list. Only gate moves out of "Ready for QA".
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idList&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '{}')
-source_list_id=$(echo "$card" | jq -r '.idList // empty')
+# Resolve source column. Only gate moves out of the QA column.
+board_card_get card "$card_id"
+source_list_id=""
+if [[ -n "$card" ]]; then
+  source_list_id=$(printf '%s' "$card" | jq -r '.stage_id // empty')
+fi
 if [[ -z "$source_list_id" ]]; then
   exit 0
 fi
 
-source_list_name=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${source_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null \
-  | jq -r '.name // empty' \
-  | tr '[:upper:]' '[:lower:]')
+board_stage_get source_list "$source_list_id"
+source_list_name=""
+if [[ -n "$source_list" ]]; then
+  source_list_name=$(printf '%s' "$source_list" | jq -r '.name // empty')
+fi
 
-if ! printf '%s' "$source_list_name" | grep -qiE '(^|[^[:alnum:]])qa([^[:alnum:]]|$)'; then
+if ! board_column_is "$source_list_name" qa; then
   exit 0
 fi
 
-# Pull commentCard + updateCard actions, newest first.
-actions=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}/actions?filter=commentCard,updateCard&limit=50&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '[]')
+# Pull notes and card updates, newest first.
+board_card_activity actions "$card_id" 50
+actions="${actions:-[]}"
 
-# Latest QA review timestamp. Prefer dateLastEdited so a refreshed comment
+# Latest QA review timestamp. Prefer the edit time so a refreshed comment
 # counts as the new reference point.
 qa_ts=$(echo "$actions" | jq -r '
-  [.[] | select(.type == "commentCard" and (.data.text // "" | startswith("## QA Review")))][0]
-  | (.data.dateLastEdited // .date) // empty
+  [.[] | select(.kind == "note" and (.text // "" | startswith("## QA Review")))][0]
+  | (.edited_at // .created_at) // empty
 ')
 
 if [[ -z "$qa_ts" ]]; then
@@ -103,15 +112,15 @@ fi
 stale_action=$(echo "$actions" | jq -r --arg qa "$qa_ts" '
   [.[]
     | select(
-        (.type == "commentCard" and (.data.text // "" | test("^## (Implementation|Design) Notes")))
-        or (.type == "updateCard" and (.data.old | has("desc")))
+        (.kind == "note" and (.text // "" | test("^## (Implementation|Design) Notes")))
+        or (.kind == "description_change")
       )
-    | select(.date > $qa)
+    | select(.created_at > $qa)
   ]
-  | sort_by(.date)
+  | sort_by(.created_at)
   | last
   | if . == null then empty
-    else "\(.type)|\(.date)|\((.data.text // .data.old.desc // "") | gsub("\n"; " ") | .[0:120])"
+    else "\(if .kind == "note" then "commentCard" else "updateCard" end)|\(.created_at)|\((.text // .old_description // "") | gsub("\n"; " ") | .[0:120])"
     end
 ')
 

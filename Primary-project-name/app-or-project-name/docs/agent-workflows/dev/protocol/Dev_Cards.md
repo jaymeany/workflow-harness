@@ -208,7 +208,7 @@ All cards MUST follow this format, the same for every role:
 |-----------|---------|
 | `#[card_number]` | `#12` (Trello's `idShort`) |
 | `[title]` | Brief descriptive card title |
-| `[trello_api_id]` | The card's 24-character Trello API ID (Trello's internal `id` field, distinct from `idShort`) |
+| `[trello_api_id]` | The card's 24-character card id (Trello's internal `id` field, distinct from `idShort`) |
 
 Example: `#12 Example Card Title 64f1c0a2b3d4e5f6a7b8c9d0`
 

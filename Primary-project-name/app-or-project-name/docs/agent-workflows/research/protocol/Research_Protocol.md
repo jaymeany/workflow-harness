@@ -112,7 +112,7 @@ If you catch yourself doing any of these, stop and re-scope:
 - Summarizing without a file open
 - Inventing a section name that sounds helpful ("Handoff Notes for Dev", "Dev Decisions", "Implementation Order") — the structural hook will reject it, but the instinct is the signal
 - Writing step-by-step what Dev should do — that is Dev's work
-- Shelling out to Trello via `curl` — MCP is the only supported path, and the Bash hook will block it anyway
+- Shelling out to the board via `curl` — MCP is the only supported path, and the Bash hook will block it anyway
 - Marking research complete because the card "feels done" rather than because the evidence is there
 - Adding a section titled "anticipate QA" or similar — QA owns its own enforcement
 
@@ -124,4 +124,4 @@ If you catch yourself doing any of these, stop and re-scope:
 - `Research_Cards.md` — card mechanics (description, sizing, naming, handoff) and hook inventory
 - `Research_Coordination.md` — Research Assistant delegation
 - `../CLAUDE.md` — directory inventory, memory, environment, source materials
-- App `CLAUDE.md` (in the build directory; not auto-loaded — Read explicitly) — service registry (QA-maintained), Trello board + list IDs, architectural patterns (single source of truth for project-specific values)
+- App `CLAUDE.md` (in the build directory; not auto-loaded — Read explicitly) — service registry (QA-maintained), board + list IDs, architectural patterns (single source of truth for project-specific values)

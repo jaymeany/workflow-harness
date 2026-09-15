@@ -43,40 +43,37 @@
 # prose (Research_Role.md) so the agent is on the discipline when the
 # hook can't enforce.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: update
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
-
-# Shared helper: is_research_column. See lib.sh.
+# The board layer: tool names, board calls and the column rule.
 # shellcheck disable=SC1091
-source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
+board_credentials_present || exit 0
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+hook_read_action
+[[ "$HOOK_ACTION" == "update" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__update_card_details" ]]; then
-  exit 0
-fi
-
-# Description not in the update payload (name/label-only update) — nothing to gate.
-new_desc=$(echo "$input" | jq -r '.tool_input.description // empty')
+# Description not in the update payload (name or label-only update): nothing to gate.
+new_desc="$HOOK_DESCRIPTION"
 [[ -z "$new_desc" ]] && exit 0
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
+card_id="$HOOK_CARD_ID"
 [[ -z "$card_id" ]] && exit 0
 
-# Fetch current description, card name, and list.
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=desc,name,idList&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-current_desc=$(echo "$card" | jq -r '.desc // empty')
-card_name=$(echo "$card" | jq -r '.name // empty')
-id_list=$(echo "$card" | jq -r '.idList // empty')
+# Fetch current description, card name, and column.
+board_card_get card "$card_id"
+[[ -n "$card" ]] || exit 0
+current_desc=$(printf '%s' "$card" | jq -r '.description // empty')
+card_name=$(printf '%s' "$card" | jq -r '.title // empty')
+id_list=$(printf '%s' "$card" | jq -r '.stage_id // empty')
 
 # Card lookup failed — fail open rather than block on a transient API issue.
 [[ -z "$card_name" ]] && exit 0
@@ -91,9 +88,12 @@ id_list=$(echo "$card" | jq -r '.idList // empty')
 # rewriting) are legitimate work, not destructive wipes. Once the card
 # advances out of Research's column, append-only re-engages.
 if [[ -n "$id_list" ]]; then
-  list_json=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${id_list}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-  list_name=$(echo "$list_json" | jq -r '.name // empty')
-  if is_research_column "$list_name"; then
+  board_stage_get list_json "$id_list"
+  list_name=""
+  if [[ -n "$list_json" ]]; then
+    list_name=$(printf '%s' "$list_json" | jq -r '.name // empty')
+  fi
+  if board_column_is "$list_name" research; then
     exit 0
   fi
 fi

@@ -36,54 +36,67 @@
 # Exit codes:
 #   0 — always. This is observational, not gating.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
+hook_read_action
+if [[ "$HOOK_ACTION" != "move" ]]; then
   exit 0
 fi
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
+board_credentials_present || exit 0
 
-# List matching by NAME, not hardcoded ID — portable across projects and
-# across feature-worktree boards that share the same column naming
-# convention.
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-dest_list_id=$(echo "$input" | jq -r '.tool_input.listId // empty')
+# Column matching by NAME, not hardcoded ID, with the board layer's column
+# rule. Portable across projects and boards that share the same column naming.
+card_id="$HOOK_CARD_ID"
+dest_list_id="$HOOK_DEST_STAGE_ID"
 
 # Only fire when the destination was "Done" or "Now" — the two legitimate
 # QA-originated destinations. Silent exit otherwise to avoid noise on
 # unrelated moves.
-dest_list_name=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${dest_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null \
-  | jq -r '.name // empty' | tr '[:upper:]' '[:lower:]')
-if ! printf '%s' "$dest_list_name" | grep -qiE '(^|[^[:alnum:]])(done|now)([^[:alnum:]]|$)'; then
+board_stage_get dest_list "$dest_list_id"
+dest_list_name=""
+if [[ -n "$dest_list" ]]; then
+  dest_list_name=$(printf '%s' "$dest_list" | jq -r '.name // empty')
+fi
+if ! board_column_is "$dest_list_name" done && ! board_column_is "$dest_list_name" now; then
   exit 0
 fi
 
-# Resolve the Ready-for-QA list id on this card's board by name. The PreToolUse
-# hook had access to the source list; here the card has already moved, so
-# look up the board from the card and find the list by name.
-card_board=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idBoard&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null | jq -r '.idBoard // empty')
+# Resolve the QA column id on this card's board by name. The PreToolUse
+# hook had access to the source column; here the card has already moved, so
+# look up the board from the card and find the column by name.
+board_card_get card "$card_id"
+card_board=""
+if [[ -n "$card" ]]; then
+  card_board=$(printf '%s' "$card" | jq -r '.board_id // empty')
+fi
 if [[ -z "$card_board" ]]; then
   exit 0
 fi
-ready_for_qa_list_id=$(curl -s --max-time 5 "https://api.trello.com/1/boards/${card_board}/lists?fields=id,name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null \
-  | jq -r '.[] | select(.name | ascii_downcase | test("(^|[^a-z0-9])qa([^a-z0-9]|$)")) | .id' \
-  | head -n1)
+board_stages lists "$card_board"
+ready_for_qa_list_id=""
+if [[ -n "$lists" ]]; then
+  ready_for_qa_list_id=$(printf '%s' "$lists" | jq -r --arg re "$(board_column_regex qa)" \
+    '[.[] | select(.name | test($re; "i"))][0].id // empty')
+fi
 if [[ -z "$ready_for_qa_list_id" ]]; then
   exit 0
 fi
 
-queue=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${ready_for_qa_list_id}/cards?fields=idShort,name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '[]')
+board_stage_cards queue "$ready_for_qa_list_id"
+queue="${queue:-[]}"
 remaining_count=$(echo "$queue" | jq 'length')
 
 # Fetch the latest notes comment per queued card and
@@ -111,12 +124,13 @@ remaining_count=$(echo "$queue" | jq 'length')
 # where multiple notes comments accrue across rounds).
 fetch_impl_notes_preview() {
   local cid="$1"
-  local actions
-  actions=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${cid}/actions?filter=commentCard&limit=20&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '[]')
+  local actions=""
+  board_card_notes actions "$cid" 20
+  actions="${actions:-[]}"
 
   local notes_text
   notes_text=$(echo "$actions" | jq -r '
-    [.[] | select(.data.text | test("^## (Implementation|Design) Notes"))] | .[0].data.text // empty
+    [.[] | select(.text | test("^## (Implementation|Design) Notes"))] | .[0].text // empty
   ')
 
   if [[ -z "$notes_text" ]]; then
@@ -147,7 +161,7 @@ else
     [[ -z "$card_id_q" ]] && continue
     preview_line=$(fetch_impl_notes_preview "$card_id_q")
     lines+="  - ${card_name_q}"$'\n'"${preview_line}"$'\n'
-  done < <(echo "$queue" | jq -r '.[] | "\(.id)\t\(.name)"')
+  done < <(echo "$queue" | jq -r '.[] | "\(.id)\t\(.title)"')
 
   summary="Ready for QA queue (${remaining_count} card${card_suffix}):"$'\n'"${lines%$'\n'}"
 fi

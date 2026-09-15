@@ -31,27 +31,31 @@
 #   0 — allow
 #   2 — deny with stderr message
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: shell
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: the tool-call reader and the board's API address.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "Bash" ]]; then
-  exit 0
-fi
+hook_read_action
+[[ "$HOOK_ACTION" == "shell" ]] || exit 0
 
-cmd=$(echo "$input" | jq -r '.tool_input.command // empty')
+cmd="$HOOK_COMMAND"
 
-# Match actual HTTP calls to Trello: an https?:// URL whose host is
-# api.trello.com. Requiring the scheme avoids false positives where
-# "curl" and "api.trello.com" appear in prose (help messages, comments,
-# heredocs writing settings files), which earlier broader patterns caught.
-# Case-insensitive to catch HTTPS/API.TRELLO.COM variants.
-if echo "$cmd" | grep -qiE 'https?://api\.trello\.com'; then
+# Match actual HTTP calls to the board's API: a URL with a scheme whose host is
+# the API host (BOARD_API_URL_ERE in the adapter's tools.conf). Requiring the
+# scheme avoids false positives where a client name and the host appear in
+# prose (help messages, comments, heredocs writing settings files).
+# Case-insensitive to catch upper-case variants.
+if echo "$cmd" | grep -qiE "$BOARD_API_URL_ERE"; then
   cat >&2 <<'EOF'
 BLOCKED: direct Trello API call from Bash.
 

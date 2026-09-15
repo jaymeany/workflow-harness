@@ -45,40 +45,32 @@
 #   0 — allow
 #   2 — deny with stderr message
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: update
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0  # Dependency missing; fail open.
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__update_card_details" ]]; then
-  exit 0
-fi
+hook_read_action
+[[ "$HOOK_ACTION" == "update" ]] || exit 0
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-if [[ -z "$card_id" ]]; then
-  exit 0
-fi
+card_id="$HOOK_CARD_ID"
+[[ -n "$card_id" ]] || exit 0
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0  # Cannot verify; fail open.
-fi
+board_credentials_present || exit 0  # Cannot verify; fail open.
 
-response=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idList&list=true&list_fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '{}')
-list_name=$(echo "$response" | jq -r '.list.name // empty')
+board_card_stage_name list_name "$card_id"
+[[ -n "$list_name" ]] || exit 0  # Could not read the column; fail open.
 
-if [[ -z "$list_name" ]]; then
-  exit 0  # Could not read list; fail open.
-fi
-
-list_lower=$(printf '%s' "$list_name" | tr '[:upper:]' '[:lower:]')
-if ! printf '%s' "$list_lower" | grep -qiE '(^|[^[:alnum:]])done([^[:alnum:]]|$)'; then
-  exit 0
-fi
+board_column_is "$list_name" done || exit 0
 
 cat >&2 <<EOF
 BLOCKED: cannot modify card in "Done" — Done is immutable.

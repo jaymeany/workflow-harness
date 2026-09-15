@@ -89,6 +89,11 @@ QA checks every change against this list before a card reaches Done.
 
 Board: {{TRELLO_BOARD_NAME}}, ID `{{TRELLO_BOARD_ID}}`
 
+The hooks read the board through `docs/agent-workflows/board/`. That folder holds
+the board id in `board.conf` and the Trello adapter in `adapters/trello/`. To use
+a different board, write an adapter for it and name it in `board.conf`. See
+`board/CONTRACT.md`.
+
 | Column | List ID | Owner |
 |---|---|---|
 | Next | `{{LIST_ID_NEXT}}` | Backlog. No role watches it |

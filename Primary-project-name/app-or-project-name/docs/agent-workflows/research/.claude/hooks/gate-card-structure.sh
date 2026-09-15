@@ -36,6 +36,9 @@
 #   - jq missing
 #   - no description present in input (label-only updates etc.)
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: update, move, create
+
 set -euo pipefail
 
 # ----------------------------------------------------------------------------
@@ -66,11 +69,15 @@ fi
 # Read tool invocation
 # ----------------------------------------------------------------------------
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the tool-call reader.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-case "$tool_name" in
-  mcp__trello__update_card_details|mcp__trello__move_card|mcp__trello__add_card_to_list) ;;
+hook_read_action
+
+case "$HOOK_ACTION" in
+  update|move|create) ;;
   *) exit 0 ;;
 esac
 
@@ -79,22 +86,22 @@ esac
 # ----------------------------------------------------------------------------
 
 desc=""
-if [[ "$tool_name" == "mcp__trello__update_card_details" || "$tool_name" == "mcp__trello__add_card_to_list" ]]; then
+if [[ "$HOOK_ACTION" == "update" || "$HOOK_ACTION" == "create" ]]; then
   # Description comes directly from the tool input (new card or explicit update).
-  desc=$(echo "$input" | jq -r '.tool_input.description // empty')
+  desc="$HOOK_DESCRIPTION"
   # No description in the payload (e.g., label-only update, or card being created
   # as a blank placeholder) → nothing to validate.
   [[ -z "$desc" ]] && exit 0
 else
-  # move_card: fetch the card's current description from Trello.
-  card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
+  # move: fetch the card's current description from the board.
+  card_id="$HOOK_CARD_ID"
   [[ -z "$card_id" ]] && exit 0
-  TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-  if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]] || ! command -v curl >/dev/null 2>&1; then
+  if ! board_credentials_present || ! command -v curl >/dev/null 2>&1; then
     exit 0
   fi
-  card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=desc&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-  desc=$(echo "$card" | jq -r '.desc // empty')
+  board_card_get card "$card_id"
+  [[ -n "$card" ]] || exit 0
+  desc=$(printf '%s' "$card" | jq -r '.description // empty')
   [[ -z "$desc" ]] && exit 0
 fi
 

@@ -23,65 +23,50 @@
 #
 # Exit codes: always 0 (non-blocking; informational side-effect only)
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
-  exit 0
-fi
+hook_read_action
+[[ "$HOOK_ACTION" == "move" ]] || exit 0
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
+board_credentials_present || exit 0
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-dest_list_id=$(echo "$input" | jq -r '.tool_input.listId // empty')
+card_id="$HOOK_CARD_ID"
+dest_list_id="$HOOK_DEST_STAGE_ID"
 if [[ -z "$card_id" || -z "$dest_list_id" ]]; then
   exit 0
 fi
 
-# Resolve the destination list's name; fire only when it contains "research"
-# (case-insensitive substring match). Name-based matching is robust to list
-# ID rotation across boards and worktrees — hardcoded IDs silently no-op
-# when they go stale. `--fail` makes curl exit non-zero on HTTP 4xx/5xx so
-# the `|| echo` fallback engages instead of feeding error bodies into jq.
-dest_list=$(curl -sf --max-time 5 "https://api.trello.com/1/lists/${dest_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-dest_list_name=$(echo "$dest_list" | jq -r '.name // empty' 2>/dev/null | tr '[:upper:]' '[:lower:]')
+# Fire only when the destination is Research's column.
+board_stage_get dest_list "$dest_list_id"
+[[ -n "$dest_list" ]] || exit 0
+dest_list_name=$(printf '%s' "$dest_list" | jq -r '.name // empty')
 [[ -z "$dest_list_name" ]] && exit 0
-case "$dest_list_name" in
-  *research*) ;;
-  *) exit 0 ;;
-esac
+board_column_is "$dest_list_name" research || exit 0
 
-# Look up the board's blue "Needs research" label.
-#
-# Matched by COLOR ONLY. This board's blue label is unnamed, so the previous
-# `and (.name | ascii_downcase == "needs research")` clause matched nothing and
-# every Dev bounce-to-Research silently attached no label at all — the miss
-# path below is a bare `exit 0`, so nothing surfaced. Label semantics here are
-# carried by the color, not the name.
-board_id=$(curl -sf --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idBoard&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null | jq -r '.idBoard // empty' 2>/dev/null || echo "")
-if [[ -z "$board_id" ]]; then
-  exit 0
-fi
+# Find the board's "Needs research" label. The adapter finds it by what the
+# label means (on Trello, the blue label). No such label: do nothing.
+board_card_get card "$card_id"
+[[ -n "$card" ]] || exit 0
+board_id=$(printf '%s' "$card" | jq -r '.board_id // empty')
+[[ -n "$board_id" ]] || exit 0
 
-labels=$(curl -sf --max-time 5 "https://api.trello.com/1/boards/${board_id}/labels?key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '[]')
-label_id=$(printf '%s' "$labels" | jq -r '.[] | select(.color=="blue") | .id' 2>/dev/null | head -n1 || echo "")
+board_labels labels "$board_id"
+board_state_label_pick label_id "$labels" needs_research
+[[ -n "$label_id" ]] || exit 0
 
-if [[ -z "$label_id" ]]; then
-  exit 0
-fi
-
-# Attach to the card. Idempotent — Trello silently ignores duplicates.
-curl -s --max-time 5 -X POST \
-  "https://api.trello.com/1/cards/${card_id}/idLabels?value=${label_id}&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" \
-  >/dev/null 2>&1 || true
+# Attach to the card. The board ignores a duplicate attach.
+board_card_label_add "$card_id" "$label_id"
 
 exit 0

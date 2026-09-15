@@ -15,7 +15,7 @@ SendMessage({to: "<name>", message: "..."}) # send to a named peer
 If a peer is not listed, it is not running. The work still routes through the board and they will pick it
 up when they boot.
 
-**Arm exactly one Monitor per session: the Trello column watcher.** Do not arm a Monitor on any inbox
+**Arm exactly one Monitor per session: the board column watcher.** Do not arm a Monitor on any inbox
 path; there is no inbox.
 
 ## What goes on the board, not into a message
@@ -33,9 +33,9 @@ something landed that they are waiting on.
 
 ## Card naming
 
-`#<idShort> <title> <24-char Trello ID>`
+`#<idShort> <title> <24-char card id>`
 
-Three parts, the same for every role. A trailing worktree tag is optional. The number is Trello's own card number. The gates match on it, so do not invent a scheme.
+Three parts, the same for every role. A trailing worktree tag is optional. The number is the board's own card number. The gates match on it, so do not invent a scheme.
 
 ## References
 

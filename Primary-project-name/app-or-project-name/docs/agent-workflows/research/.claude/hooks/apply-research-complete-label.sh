@@ -29,31 +29,30 @@
 # Exit codes:
 #   0 — always (non-blocking; label-attach is best-effort)
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: create
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
-
 # Shared helpers: evaluate_research_complete, attach_research_complete_label.
+# lib.sh also loads the board layer.
 # shellcheck disable=SC1091
 source "$(dirname "$0")/lib.sh"
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
+board_credentials_present || exit 0
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+hook_read_action
+[[ "$HOOK_ACTION" == "create" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__add_card_to_list" ]]; then
-  exit 0
-fi
-
-# The submitted description lives on tool_input; the new card id on tool_response.
-new_desc=$(echo "$input" | jq -r '.tool_input.description // empty')
-card_id=$(echo "$input" | jq -r '.tool_response.id // empty')
+# The submitted description lives on the tool input; the new card id on the
+# tool response. The board layer reads the id from either response shape: a
+# plain object, or the content array MCP tools return.
+new_desc="$HOOK_DESCRIPTION"
+card_id="$HOOK_CREATED_ID"
 
 if [[ -z "$new_desc" || -z "$card_id" ]]; then
   exit 0

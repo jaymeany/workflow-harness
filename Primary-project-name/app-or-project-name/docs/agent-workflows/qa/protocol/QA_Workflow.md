@@ -47,7 +47,7 @@ For cards tagged `[HOTFIX]`:
 
 ## 13. Team Composition
 
-**You are the QA reviewer. Agents are focused research assistants, not full QA reviewers.** Protocol judgment, the decision matrix, and Trello operations stay with you. Agents do targeted code searches you'd have to do anyway.
+**You are the QA reviewer. Agents are focused research assistants, not full QA reviewers.** Protocol judgment, the decision matrix, and board operations stay with you. Agents do targeted code searches you'd have to do anyway.
 
 ### When to Use a Team
 
@@ -72,7 +72,7 @@ For cards tagged `[HOTFIX]`:
 - All protocol checks (token compliance, security, content integrity, site invariants, broken state, acceptance criteria)
 - The "Where is this documented?" filter on all findings
 - Decision matrix judgment (PASS/FAIL/escalate)
-- Trello operations (QA comments, card moves, tracking cards)
+- board operations (QA comments, card moves, tracking cards)
 - Bug identification and severity assessment
 
 ### What Agents Do

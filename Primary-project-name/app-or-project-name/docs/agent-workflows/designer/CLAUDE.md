@@ -43,7 +43,7 @@ Role and protocol docs are also preloaded by SessionStart hooks, so they are ava
 >
 >**There is no messaging bus.** Peers are reached with `ListAgents` and `SendMessage`.
 >
->**Arm exactly one Monitor per session:** the Trello column watcher.
+>**Arm exactly one Monitor per session:** the board column watcher.
 
 ## Where you actually work
 

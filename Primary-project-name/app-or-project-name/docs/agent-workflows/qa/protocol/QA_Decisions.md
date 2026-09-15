@@ -16,7 +16,7 @@
 
 ### Findings Tracking
 
-Untracked observations during review become buried "minor notes" that never make it onto the board — they vanish from session memory, never get prioritized, and become tomorrow's incidents. Every finding that surfaces during a review gets a Trello card in "Research" before the card can PASS.
+Untracked observations during review become buried "minor notes" that never make it onto the board — they vanish from session memory, never get prioritized, and become tomorrow's incidents. Every finding that surfaces during a review gets a card in "Research" before the card can PASS.
 
 A card cannot move to Done with untracked observations. Either:
 1. **Create a tracking card** for the gap/finding, then PASS

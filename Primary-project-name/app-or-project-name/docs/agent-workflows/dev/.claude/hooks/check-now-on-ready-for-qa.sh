@@ -2,19 +2,16 @@
 #
 # check-now-on-ready-for-qa.sh — Claude Code PostToolUse hook
 #
-# When a card is moved out of Now via mcp__trello__move_card — either to
-# "Ready for QA" (handoff) or to "Research and prep" (Clarification bounce
-# per Dev_Protocol §7) — query the Now column and surface the next card as
+# When a card is moved out of Now with the board's move tool — either to the
+# QA column (handoff) or to the Research column (Clarification bounce per
+# Dev_Protocol §7) — query the Now column and surface the next card as
 # additionalContext so Dev keeps pulling without pausing.
 #
-# List resolution is name-based, not ID-based: the destination list's name
-# is fetched once and matched on case-insensitive substrings ("qa",
-# "research"); the Now list ID is resolved at runtime by listing the
-# moved card's board and matching "now". Hardcoded IDs silently no-op when
-# they rotate (board recreated, worktree-specific board, etc.) — name
-# matching survives ID churn.
+# Column resolution is name-based, not ID-based, with the board layer's
+# column rule. Hardcoded IDs silently no-op when they rotate (board recreated,
+# worktree-specific board, etc.) — name matching survives ID churn.
 #
-# Matcher in settings.json should be: "mcp__trello__move_card"
+# Matcher in settings.json: the board's move tool.
 # Hook event: PostToolUse
 #
 # Environment:
@@ -22,6 +19,8 @@
 #   TRELLO_API_TOKEN or TRELLO_TOKEN — required (either name accepted)
 #
 # Requires: jq, curl
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
 #
 # Exit codes: always 0 (never blocks; informational only)
 
@@ -34,18 +33,20 @@ if ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
+hook_read_action
+if [[ "$HOOK_ACTION" != "move" ]]; then
   exit 0
 fi
 
-target_list=$(echo "$input" | jq -r '.tool_input.listId // empty')
+target_list="$HOOK_DEST_STAGE_ID"
 [[ -z "$target_list" ]] && exit 0
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
+if ! board_credentials_present; then
   # Resolve dest name without API; we can't, so report a degraded message.
   jq -n '{
     "hookSpecificOutput": {
@@ -56,35 +57,33 @@ if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
   exit 0
 fi
 
-# Resolve dest list's name + board in one call. `--fail` makes curl exit
-# non-zero on HTTP 4xx/5xx so the `|| echo '{}'` fallback engages instead
-# of feeding plain-text error bodies into jq. Each jq call also redirects
-# stderr and falls back to empty so a malformed response can't abort the
-# hook under `set -e`.
-dest_meta=$(curl -sf --max-time 5 "https://api.trello.com/1/lists/${target_list}?fields=name,idBoard&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-dest_name=$(echo "$dest_meta" | jq -r '.name // empty' 2>/dev/null || echo "")
-board_id=$(echo "$dest_meta" | jq -r '.idBoard // empty' 2>/dev/null || echo "")
+# Resolve the destination column's name and board in one call.
+board_stage_get dest_meta "$target_list"
+dest_name=""
+board_id=""
+if [[ -n "$dest_meta" ]]; then
+  dest_name=$(printf '%s' "$dest_meta" | jq -r '.name // empty')
+  board_id=$(printf '%s' "$dest_meta" | jq -r '.board_id // empty')
+fi
 
 [[ -z "$dest_name" || -z "$board_id" ]] && exit 0
 
-dest_lower=$(echo "$dest_name" | tr '[:upper:]' '[:lower:]')
+if board_column_is "$dest_name" qa; then
+  move_label="moved to Ready for QA"
+elif board_column_is "$dest_name" research; then
+  move_label="bounced to Research and prep"
+else
+  # Move went somewhere we don't surface from (e.g., Done, Archive).
+  exit 0
+fi
 
-case "$dest_lower" in
-  *qa*)
-    move_label="moved to Ready for QA"
-    ;;
-  *research*)
-    move_label="bounced to Research and prep"
-    ;;
-  *)
-    # Move went somewhere we don't surface from (e.g., Done, Archive).
-    exit 0
-    ;;
-esac
-
-# Find the Now list on the same board by name.
-lists=$(curl -sf --max-time 5 "https://api.trello.com/1/boards/${board_id}/lists?fields=id,name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '[]')
-now_list_id=$(echo "$lists" | jq -r '.[] | select((.name | ascii_downcase) | contains("now")) | .id' 2>/dev/null | head -n1 || echo "")
+# Find the Now column on the same board by name.
+board_stages lists "$board_id"
+now_list_id=""
+if [[ -n "$lists" ]]; then
+  now_list_id=$(printf '%s' "$lists" | jq -r --arg re "$(board_column_regex now)" \
+    '[.[] | select(.name | test($re; "i"))][0].id // empty' 2>/dev/null || echo "")
+fi
 
 if [[ -z "$now_list_id" ]]; then
   jq -n --arg label "$move_label" '{
@@ -96,13 +95,8 @@ if [[ -z "$now_list_id" ]]; then
   exit 0
 fi
 
-# Fetch cards in Now with narrowed fields. We take only `.[0]` client-side —
-# the Trello `limit=1` query param does NOT respect `pos` ordering (empirically
-# tested: returned the wrong card). Omitting `limit` returns cards in `pos`
-# order, which is what we need.
-response=$(curl -sSf --max-time 10 \
-  "https://api.trello.com/1/lists/${now_list_id}/cards?fields=id,idShort,name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" \
-  2>/dev/null || echo "")
+# Fetch cards in Now, in board order. Only the first is used.
+board_stage_cards response "$now_list_id"
 
 if [[ -z "$response" ]] || ! echo "$response" | jq -e 'type == "array"' >/dev/null 2>&1; then
   jq -n --arg label "$move_label" '{
@@ -119,17 +113,12 @@ count=$(echo "$response" | jq 'length')
 if [[ "$count" == "0" ]]; then
   message="Card ${move_label}. Now is empty — queue drained. Stand by."
 else
-  next_short=$(echo "$response" | jq -r '.[0].idShort')
+  next_short=$(echo "$response" | jq -r '.[0].number')
   next_id=$(echo "$response" | jq -r '.[0].id')
-  next_name=$(echo "$response" | jq -r '.[0].name')
-  message=$(printf "Card %s. NEXT CARD: #%s %s (id: %s). Call mcp__trello__get_card on this id now. Do NOT pause to ask the user — auto-pickup is the policy." "$move_label" "$next_short" "$next_name" "$next_id")
+  next_name=$(echo "$response" | jq -r '.[0].title')
+  message=$(printf "Card %s. NEXT CARD: #%s %s (id: %s). Call %s on this id now. Do NOT pause to ask the user — auto-pickup is the policy." "$move_label" "$next_short" "$next_name" "$next_id" "$BOARD_TOOL_GET_CARD")
 fi
 
-jq -n --arg msg "$message" '{
-  "hookSpecificOutput": {
-    "hookEventName": "PostToolUse",
-    "additionalContext": $msg
-  }
-}'
+hook_emit_context PostToolUse "$message"
 
 exit 0

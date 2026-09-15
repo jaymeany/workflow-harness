@@ -27,26 +27,30 @@
 #   0 — allow
 #   2 — deny with stderr message
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: shell
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: the tool-call reader and the board's API address.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "Bash" ]]; then
-  exit 0
-fi
+hook_read_action
+[[ "$HOOK_ACTION" == "shell" ]] || exit 0
 
-cmd=$(echo "$input" | jq -r '.tool_input.command // empty')
+cmd="$HOOK_COMMAND"
 
 # Match any HTTP-client command (curl, wget, http, https, fetch) that
-# references api.trello.com in the same command. Case-insensitive to catch
-# API.TRELLO.COM variants. Broad match on HTTP clients to cover heredocs
-# and pipes.
-if echo "$cmd" | grep -qiE '(curl|wget|\bhttp\b|\bhttps\b|\bfetch\b)[^|;&]*api\.trello\.com'; then
+# references the board's API host (BOARD_API_HOST_ERE in the adapter's
+# tools.conf) in the same command. Case-insensitive. Broad match on HTTP
+# clients to cover heredocs and pipes.
+if echo "$cmd" | grep -qiE "(curl|wget|\bhttp\b|\bhttps\b|\bfetch\b)[^|;&]*${BOARD_API_HOST_ERE}"; then
   cat >&2 <<'EOF'
 BLOCKED: direct Trello API call from Bash.
 

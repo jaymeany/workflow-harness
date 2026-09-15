@@ -58,4 +58,4 @@ The plan, named in the project `CLAUDE.md` § Plan, is the whole build. Read it 
 
 - `Dev_Protocol.md` — implementation methodology (HOW): pre-implementation checklist, build verification, DoD, card update format, clarification, partial completion, anti-patterns, git commit discipline, card naming
 - `CLAUDE.md` (this folder) — directory inventory, memory, environment, planning docs, documentation repository
-- App `CLAUDE.md` — service registry, Trello board + list IDs, architectural patterns
+- App `CLAUDE.md` — service registry, board + list IDs, architectural patterns

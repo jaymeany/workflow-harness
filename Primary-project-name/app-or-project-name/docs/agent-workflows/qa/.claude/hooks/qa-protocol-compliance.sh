@@ -3,9 +3,9 @@
 # qa-protocol-compliance.sh — Claude Code PreToolUse hook
 #
 # Pure-logic backstop ensuring QA applied its protocol to a card before
-# moving it out of "QA". Fires on mcp__trello__move_card when
-# the card's source list is "QA". Checks the latest QA comment
-# on the card for the structured template defined in QA_Decisions.md §9.
+# moving it out of "QA". Fires on the board's move tool when the card's
+# source column is QA. Checks the latest QA comment on the card for the
+# structured template defined in QA_Decisions.md §9.
 #
 # Destination semantics:
 #   Done             → expects Status: PASS + all required section headers
@@ -22,18 +22,19 @@
 #                       surface.
 #
 # Side effects (pre-move):
-#   On FAIL → Now: applies the board's red label to the card.
-#   On PASS → Done: removes the board's red label (if previously applied)
-#                   AND applies the purple "QA complete" label (creating
-#                   it on the board if absent — case-insensitive match
-#                   on color=purple, name="QA complete").
-#   On BOUNCE → Research: removes the green "Research complete"
-#                   label (if present) AND applies the blue "Needs research"
-#                   label (creating it if absent — case-insensitive match
-#                   on color=blue, name="Needs research"). A bounce means the
-#                   spec is unworkable, so the card's "Research complete"
-#                   assertion is now false — it must not keep claiming
-#                   finished research while it sits queued for re-spec.
+#   On FAIL → Now: applies the board's "QA fail" label to the card.
+#   On PASS → Done: removes the "QA fail" label (if previously applied)
+#                   AND applies the "QA complete" label (creating it on the
+#                   board if absent).
+#   On BOUNCE → Research: removes the "Research complete" label (if present)
+#                   AND applies the "Needs research" label (creating it if
+#                   absent). A bounce means the spec is unworkable, so the
+#                   card's "Research complete" assertion is now false — it
+#                   must not keep claiming finished research while it sits
+#                   queued for re-spec.
+#   The board adapter decides how each label is found. On Trello, labels are
+#   matched by color: red for QA fail, purple for QA complete, green for
+#   Research complete, blue for Needs research.
 #   All label operations are non-fatal — failures print a warning via
 #   additionalContext but the move proceeds.
 #
@@ -53,13 +54,15 @@
 # — QA runs them manually as described in QA_Checks.md §0. This hook only
 # enforces that QA documented the result on the card.
 #
-# Matcher in settings.json should be: "mcp__trello__move_card"
+# Matcher in settings.json: the board's move tool.
 #
 # Environment:
 #   TRELLO_API_KEY — required
 #   TRELLO_API_TOKEN or TRELLO_TOKEN — required (either name accepted)
 #
 # Requires: jq, curl
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
 #
 # Exit codes:
 #   0 — allow
@@ -71,62 +74,64 @@ if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
+hook_read_action
+if [[ "$HOOK_ACTION" != "move" ]]; then
   exit 0
 fi
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-dest_list_id=$(echo "$input" | jq -r '.tool_input.listId // empty')
+card_id="$HOOK_CARD_ID"
+dest_list_id="$HOOK_DEST_STAGE_ID"
 if [[ -z "$card_id" || -z "$dest_list_id" ]]; then
   exit 0
 fi
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
+board_credentials_present || exit 0
 
-# Fetch the card's current (source) list id + board id. No list-name
-# expansion — source and destination are matched by ID.
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idList,idBoard&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '{}')
-source_list_id=$(echo "$card" | jq -r '.idList // empty')
+# Fetch the card's current (source) column id + board id.
+board_card_get card "$card_id"
+source_list_id=""
+if [[ -n "$card" ]]; then
+  source_list_id=$(printf '%s' "$card" | jq -r '.stage_id // empty')
+fi
 
 if [[ -z "$source_list_id" ]]; then
   exit 0
 fi
 
-# Resolve list names (case-insensitive) instead of hardcoded IDs so the hook
-# ports across projects and across feature-worktree boards that share the
-# same column naming convention.
+# Resolve column names instead of hardcoded IDs so the hook ports across
+# projects and boards that share the same column naming convention.
 resolve_list_name() {
-  local list_id="$1"
-  curl -s --max-time 5 "https://api.trello.com/1/lists/${list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null \
-    | jq -r '.name // empty' \
-    | tr '[:upper:]' '[:lower:]'
+  local list_id="$1" list=""
+  board_stage_get list "$list_id"
+  if [[ -n "$list" ]]; then
+    printf '%s' "$list" | jq -r '.name // empty'
+  fi
 }
 
 source_list_name=$(resolve_list_name "$source_list_id")
 dest_list_name=$(resolve_list_name "$dest_list_id")
 
 # Only gate moves originating from "QA".
-if ! printf '%s' "$source_list_name" | grep -qiE '(^|[^[:alnum:]])qa([^[:alnum:]]|$)'; then
+if ! board_column_is "$source_list_name" qa; then
   exit 0
 fi
 
-# Determine expected status based on destination list name.
-if printf '%s' "$dest_list_name" | grep -qiE '(^|[^[:alnum:]])done([^[:alnum:]]|$)'; then
+# Determine expected status based on destination column name.
+if board_column_is "$dest_list_name" done; then
   expected_status="PASS"
   dest_name="Done"
-elif printf '%s' "$dest_list_name" | grep -qiE '(^|[^[:alnum:]])now([^[:alnum:]]|$)'; then
+elif board_column_is "$dest_list_name" now; then
   expected_status="FAIL"
   dest_name="Now"
-elif printf '%s' "$dest_list_name" | grep -qiE '(^|[^[:alnum:]])research([^[:alnum:]]|$)'; then
+elif board_column_is "$dest_list_name" research; then
   expected_status="BOUNCE"
   dest_name="Research"
-elif printf '%s' "$dest_list_name" | grep -qiE '(^|[^[:alnum:]])design([^[:alnum:]]|$)'; then
+elif board_column_is "$dest_list_name" design; then
   expected_status="BOUNCE"
   dest_name="Design"
 else
@@ -145,10 +150,11 @@ EOF
 fi
 
 # Fetch latest QA Review comment.
-comments=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}/actions?filter=commentCard&limit=50&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '[]')
+board_card_notes comments "$card_id" 50
+comments="${comments:-[]}"
 
 qa_text=$(echo "$comments" | jq -r '
-  [.[] | select(.data.text != null and (.data.text | startswith("## QA Review")))][0].data.text // empty
+  [.[] | select(.text != null and (.text | startswith("## QA Review")))][0].text // empty
 ')
 
 if [[ -z "$qa_text" ]]; then
@@ -184,6 +190,11 @@ fi
 # at the end of execution. Must NOT be written to stderr on exit 0 — Claude
 # Code discards that channel.
 INFO_MSGS=""
+
+board_id=""
+if [[ -n "$card" ]]; then
+  board_id=$(printf '%s' "$card" | jq -r '.board_id // empty')
+fi
 
 # For PASS → Done: all required check sections must be present.
 if [[ "$expected_status" == "PASS" ]]; then
@@ -247,33 +258,27 @@ if [[ "$expected_status" == "PASS" ]]; then
     exit 2
   fi
 
-  # Label operations on PASS → Done.
-  # Non-fatal: Trello returns 404/etc on missing state; warnings accumulate
-  # into INFO_MSGS and emit at the end.
-  board_id=$(echo "$card" | jq -r '.idBoard // empty')
+  # Label operations on PASS → Done. Non-fatal: warnings accumulate into
+  # INFO_MSGS and emit at the end. A failed label lookup counts as no labels.
   if [[ -n "$board_id" ]]; then
-    labels=$(curl -s --max-time 5 "https://api.trello.com/1/boards/${board_id}/labels?fields=id,color,name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '[]')
+    board_labels labels "$board_id"
+    labels="${labels:-[]}"
 
-    # 1. Clear the red label if previously applied (e.g., from a prior FAIL bounce).
-    red_label_id=$(echo "$labels" | jq -r '[.[] | select(.color == "red")][0].id // empty')
+    # 1. Clear the QA fail label if previously applied (e.g., from a prior FAIL bounce).
+    board_state_label_pick red_label_id "$labels" qa_fail
     if [[ -n "$red_label_id" ]]; then
-      curl -s --max-time 5 -X DELETE "https://api.trello.com/1/cards/${card_id}/idLabels/${red_label_id}?key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" >/dev/null 2>&1 || true
+      board_card_label_remove "$card_id" "$red_label_id"
     fi
 
-    # 2. Apply the purple "QA complete" label. Matched by COLOR ONLY — label
-    #    semantics on this board are carried by color and the labels are
-    #    unnamed (name == ""). A name predicate here matched nothing, so the
-    #    lookup fell through to the create-branch below and would have minted
-    #    a duplicate purple label on the first PASS. Create remains a fallback
-    #    for a board with no purple label at all.
-    qa_complete_label_id=$(echo "$labels" | jq -r '[.[] | select(.color == "purple")][0].id // empty')
+    # 2. Apply the "QA complete" label. Create remains a fallback for a board
+    #    with no such label at all.
+    board_state_label_pick qa_complete_label_id "$labels" qa_complete
     if [[ -z "$qa_complete_label_id" ]]; then
-      created=$(curl -s --max-time 5 -X POST \
-        "https://api.trello.com/1/labels?name=QA%20complete&color=purple&idBoard=${board_id}&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-      qa_complete_label_id=$(echo "$created" | jq -r '.id // empty')
+      board_label_create qa_complete_label_id "$board_id" qa_complete
     fi
     if [[ -n "$qa_complete_label_id" ]]; then
-      if ! curl -s --max-time 5 -X POST "https://api.trello.com/1/cards/${card_id}/idLabels?key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" -d "value=${qa_complete_label_id}" >/dev/null 2>&1; then
+      board_card_label_add "$card_id" "$qa_complete_label_id"
+      if [[ "$BOARD_STATUS" != "ok" ]]; then
         INFO_MSGS+="WARNING: could not apply QA complete label to card ${card_id}; move allowed."$'\n'
       fi
     else
@@ -296,13 +301,14 @@ EOF
     exit 2
   fi
 
-  # Tag the failed card with the board's red label. Non-fatal.
-  board_id=$(echo "$card" | jq -r '.idBoard // empty')
+  # Tag the failed card with the board's QA fail label. Non-fatal.
   if [[ -n "$board_id" ]]; then
-    labels=$(curl -s --max-time 5 "https://api.trello.com/1/boards/${board_id}/labels?fields=id,color&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '[]')
-    red_label_id=$(echo "$labels" | jq -r '[.[] | select(.color == "red")][0].id // empty')
+    board_labels labels "$board_id"
+    labels="${labels:-[]}"
+    board_state_label_pick red_label_id "$labels" qa_fail
     if [[ -n "$red_label_id" ]]; then
-      if ! curl -s --max-time 5 -X POST "https://api.trello.com/1/cards/${card_id}/idLabels?key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" -d "value=${red_label_id}" >/dev/null 2>&1; then
+      board_card_label_add "$card_id" "$red_label_id"
+      if [[ "$BOARD_STATUS" != "ok" ]]; then
         INFO_MSGS+="WARNING: could not apply red label to card ${card_id}; move allowed."$'\n'
       fi
     else
@@ -365,33 +371,28 @@ EOF
   # labels; the destination column is the routing signal.
   # For a bounce to Research, the label must not contradict the column: the
   # spec — not the implementation — is unworkable, so the card's "Research
-  # complete" (green) assertion is now false and comes off, and "Needs
-  # research" (blue) goes on. This mirrors FAIL→red and PASS→purple. Red is
-  # reserved for FAIL (Dev fault), purple for PASS; a bounce is neither.
+  # complete" assertion is now false and comes off, and "Needs research" goes
+  # on. This mirrors FAIL → QA fail and PASS → QA complete.
   # Non-fatal — warnings accumulate.
-  board_id=$(echo "$card" | jq -r '.idBoard // empty')
   if [[ -n "$board_id" && "$dest_name" == "Research" ]]; then
-    labels=$(curl -s --max-time 5 "https://api.trello.com/1/boards/${board_id}/labels?fields=id,color,name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '[]')
+    board_labels labels "$board_id"
+    labels="${labels:-[]}"
 
-    # 1. Remove the green "Research complete" label if present. Matched by
-    #    COLOR ONLY, consistent with every other label op here.
-    research_complete_label_id=$(echo "$labels" | jq -r '[.[] | select(.color == "green")][0].id // empty')
+    # 1. Remove the "Research complete" label if present.
+    board_state_label_pick research_complete_label_id "$labels" research_complete
     if [[ -n "$research_complete_label_id" ]]; then
-      curl -s --max-time 5 -X DELETE "https://api.trello.com/1/cards/${card_id}/idLabels/${research_complete_label_id}?key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" >/dev/null 2>&1 || true
+      board_card_label_remove "$card_id" "$research_complete_label_id"
     fi
 
-    # 2. Apply the blue "Needs research" label. Matched by COLOR ONLY, same
-    #    rationale as the purple lookup above — unnamed labels, color carries
-    #    the semantics. Create remains a fallback for a board with no blue
-    #    label at all.
-    needs_research_label_id=$(echo "$labels" | jq -r '[.[] | select(.color == "blue")][0].id // empty')
+    # 2. Apply the "Needs research" label. Create remains a fallback for a
+    #    board with no such label at all.
+    board_state_label_pick needs_research_label_id "$labels" needs_research
     if [[ -z "$needs_research_label_id" ]]; then
-      created=$(curl -s --max-time 5 -X POST \
-        "https://api.trello.com/1/labels?name=Needs%20research&color=blue&idBoard=${board_id}&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-      needs_research_label_id=$(echo "$created" | jq -r '.id // empty')
+      board_label_create needs_research_label_id "$board_id" needs_research
     fi
     if [[ -n "$needs_research_label_id" ]]; then
-      if ! curl -s --max-time 5 -X POST "https://api.trello.com/1/cards/${card_id}/idLabels?key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" -d "value=${needs_research_label_id}" >/dev/null 2>&1; then
+      board_card_label_add "$card_id" "$needs_research_label_id"
+      if [[ "$BOARD_STATUS" != "ok" ]]; then
         INFO_MSGS+="WARNING: could not apply Needs research label to card ${card_id}; move allowed."$'\n'
       fi
     else
@@ -406,13 +407,7 @@ fi
 # This is the only reliable channel for non-blocking info to reach the model
 # on exit 0; plain stderr is discarded by Claude Code.
 if [[ -n "$INFO_MSGS" ]]; then
-  jq -n --arg ctx "$INFO_MSGS" '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "allow",
-      additionalContext: $ctx
-    }
-  }'
+  hook_emit_context PreToolUse "$INFO_MSGS" allow
 fi
 
 exit 0

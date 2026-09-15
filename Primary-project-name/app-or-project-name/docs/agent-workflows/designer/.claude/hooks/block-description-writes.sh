@@ -29,27 +29,30 @@
 # input alone. Does not fetch the card; the rule is "no description field
 # in the update," not "no description content change."
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: update
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names and the tool-call reader.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__update_card_details" ]]; then
+hook_read_action
+[[ "$HOOK_ACTION" == "update" ]] || exit 0
+
+# If the update doesn't include a description field, this is a name or
+# label-only update. Pass through.
+if [[ "$HOOK_HAS_DESCRIPTION" != "true" ]]; then
   exit 0
 fi
 
-# If tool_input doesn't include a description field, this is a name/label-only
-# update. Pass through.
-has_desc=$(echo "$input" | jq -r '.tool_input | has("description")')
-if [[ "$has_desc" != "true" ]]; then
-  exit 0
-fi
-
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
+card_id="$HOOK_CARD_ID"
 
 cat >&2 <<EOF
 BLOCKED: Design cannot write the card description (cardId: ${card_id:-unknown}).

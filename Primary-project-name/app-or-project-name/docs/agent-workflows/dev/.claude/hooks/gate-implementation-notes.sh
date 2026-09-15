@@ -60,57 +60,62 @@
 # prose (Dev_Protocol.md §5 + §6) so the agent can self-enforce when the
 # hook can't.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
+hook_read_action
+if [[ "$HOOK_ACTION" != "move" ]]; then
   exit 0
 fi
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-dest_list_id=$(echo "$input" | jq -r '.tool_input.listId // empty')
+card_id="$HOOK_CARD_ID"
+dest_list_id="$HOOK_DEST_STAGE_ID"
 [[ -z "$card_id" || -z "$dest_list_id" ]] && exit 0
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-[[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]] && exit 0
+board_credentials_present || exit 0
 
-# Resolve destination list name (case-insensitive). Only fire when moving
-# INTO Ready for QA — moves to Now, Done, or anywhere else are out of scope
-# for this hook.
-list=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${dest_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-dest_list_name=$(echo "$list" | jq -r '.name // empty' | tr '[:upper:]' '[:lower:]')
+# Resolve the destination column name. Only fire when moving INTO the QA
+# column — moves to Now, Done, or anywhere else are out of scope for this
+# hook. The column is found with the board layer's column rule, so "QA",
+# "QA/QC" and "Ready for QA" all count.
+board_stage_get list "$dest_list_id"
+dest_list_name=""
+if [[ -n "$list" ]]; then
+  dest_list_name=$(printf '%s' "$list" | jq -r '.name // empty')
+fi
 
 [[ -z "$dest_list_name" ]] && exit 0
 
-# Substring match on "qa" (this board's column is "QA"; other boards use
-# "Ready for QA"), consistent with check-now-on-ready-for-qa.sh and
-# gate-per-card-commit.sh. An exact "ready for qa" test meant this gate
-# silently never fired on the board it was written for — every card reached QA
-# without implementation notes.
-case "$dest_list_name" in
-  *qa*) ;;
-  *) exit 0 ;;
-esac
+board_column_is "$dest_list_name" qa || exit 0
 
 # Fetch the card name (for the error message).
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-card_name=$(echo "$card" | jq -r '.name // empty')
+board_card_get card "$card_id"
+card_name=""
+if [[ -n "$card" ]]; then
+  card_name=$(printf '%s' "$card" | jq -r '.title // empty')
+fi
 
-# Card lookup failed — fail open.
+# Card lookup failed: fail open.
 [[ -z "$card_name" ]] && exit 0
 
 # Fetch the most-recent comment on the card. The latest comment when Dev
 # moves Now → Ready for QA should be the Implementation Notes Dev just
 # posted. If there are no comments at all, that itself is a fail (the
 # artifact is missing).
-actions=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}/actions?filter=commentCard&limit=1&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '[]')
-comment_text=$(echo "$actions" | jq -r '.[0].data.text // empty')
+board_card_notes actions "$card_id" 1
+actions="${actions:-[]}"
+comment_text=$(echo "$actions" | jq -r '.[0].text // empty')
 
 if [[ -z "$comment_text" ]]; then
   cat >&2 <<EOF

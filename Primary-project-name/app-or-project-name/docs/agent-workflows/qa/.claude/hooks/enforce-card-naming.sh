@@ -32,21 +32,27 @@
 #   0 — allow
 #   2 — deny with stderr message
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: update, create
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, the tool-call reader, the card id format.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-case "$tool_name" in
-  mcp__trello__update_card_details|mcp__trello__add_card_to_list) ;;
+hook_read_action
+case "$HOOK_ACTION" in
+  update|create) ;;
   *) exit 0 ;;
 esac
 
-new_name=$(echo "$input" | jq -r '.tool_input.name // empty')
+new_name="$HOOK_NAME"
 
 # Only validate when the rename appears to be using the convention.
 if [[ -z "$new_name" || "${new_name:0:1}" != "#" ]]; then
@@ -55,13 +61,14 @@ fi
 
 # Convention regex:
 #   ^#                       — leading hash
-#   [0-9]+                   — idShort (digits)
+#   [0-9]+                   — card number (digits)
 #   [[:space:]]              — separator
 #   .+                       — title (greedy; can contain spaces)
 #   [[:space:]]              — separator
-#   [a-f0-9]{24}             — trello_api_id (24 lowercase hex)
+#   BOARD_CARD_ID_ERE        — the card id, in the adapter's format
+#                              (Trello: 24 lowercase hex characters)
 #   (...)?$                  — an OPTIONAL trailing legacy suffix, see above
-if ! [[ "$new_name" =~ ^#[0-9]+[[:space:]].+[[:space:]][a-f0-9]{24}([[:space:]][A-Za-z0-9_-]+)?$ ]]; then
+if ! [[ "$new_name" =~ ^#[0-9]+[[:space:]].+[[:space:]]${BOARD_CARD_ID_ERE}([[:space:]][A-Za-z0-9_-]+)?$ ]]; then
   cat >&2 <<EOF
 BLOCKED: card name "$new_name" doesn't match the naming convention.
 

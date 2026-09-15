@@ -71,6 +71,9 @@
 #     block legitimate work)
 #   - the card's board is not in BOARD_TAG_MAP (no invented tag)
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: create, update
+
 set -euo pipefail
 
 # ----------------------------------------------------------------------------
@@ -98,16 +101,18 @@ fi
 # Read tool invocation
 # ----------------------------------------------------------------------------
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
-new_name=$(echo "$input" | jq -r '.tool_input.name // empty')
+# The board layer: tool names, board calls and the tool-call reader.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-case "$tool_name" in
-  mcp__trello__add_card_to_list|mcp__trello__update_card_details) ;;
+hook_read_action
+new_name="$HOOK_NAME"
+
+case "$HOOK_ACTION" in
+  create|update) ;;
   *) exit 0 ;;
 esac
-
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
 
 # board_tag <boardId> → worktree tag (or empty) — defined in
 # protocol-enforcement.conf, sourced above. Kept there (a 3.2-safe case
@@ -117,7 +122,7 @@ TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
 # add_card_to_list — require [TBD] placeholder
 # ============================================================================
 
-if [[ "$tool_name" == "mcp__trello__add_card_to_list" ]]; then
+if [[ "$HOOK_ACTION" == "create" ]]; then
   if [[ -z "$new_name" ]]; then
     exit 0
   fi
@@ -170,21 +175,26 @@ if [[ -z "$new_name" ]]; then
   exit 0
 fi
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
+card_id="$HOOK_CARD_ID"
 if [[ -z "$card_id" ]]; then
   exit 0
 fi
 
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]] || ! command -v curl >/dev/null 2>&1; then
+if ! board_credentials_present || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-# Fetch idShort + id + idBoard. The board id is what lets us derive the
-# correct tag for THIS card, rather than a hardcoded default.
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idShort,id,idBoard&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-id_short=$(echo "$card" | jq -r '.idShort // empty')
-trello_id=$(echo "$card" | jq -r '.id // empty')
-id_board=$(echo "$card" | jq -r '.idBoard // empty')
+# Fetch the card number, id and board id. The board id is what lets us
+# derive the correct tag for THIS card, rather than a hardcoded default.
+board_card_get card "$card_id"
+id_short=""
+trello_id=""
+id_board=""
+if [[ -n "$card" ]]; then
+  id_short=$(printf '%s' "$card" | jq -r '.number // empty')
+  trello_id=$(printf '%s' "$card" | jq -r '.id // empty')
+  id_board=$(printf '%s' "$card" | jq -r '.board_id // empty')
+fi
 
 # If the lookup didn't return what we need, fail open. This hook should not
 # block on Trello flakiness — the structural gate already protects content.

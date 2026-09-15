@@ -38,20 +38,24 @@
 #
 # Fails open (allow) if jq missing.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: comment
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names and the tool-call reader.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__add_comment" ]]; then
-  exit 0
-fi
+hook_read_action
+[[ "$HOOK_ACTION" == "comment" ]] || exit 0
 
-text=$(echo "$input" | jq -r '.tool_input.text // empty')
+text="$HOOK_TEXT"
 
 # Filter on QA review comments only. The §9 template starts with
 # "## QA Review"; anything else is out of scope for this hook.

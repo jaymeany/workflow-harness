@@ -20,17 +20,23 @@
 #   0 — allow (only if matcher misfires; defensive)
 #   2 — deny with stderr message
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: comment, comment_edit, comment_delete
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names and the tool-call reader.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-case "$tool_name" in
-  mcp__trello__add_comment|mcp__trello__update_comment|mcp__trello__delete_comment) ;;
+hook_read_action
+case "$HOOK_ACTION" in
+  comment|comment_edit|comment_delete) ;;
   *) exit 0 ;;
 esac
 

@@ -1,6 +1,6 @@
 # Research Cards
 
-Card mechanics for the Research role. This file answers **HOW (cards)** — every procedural rule for assembling a Trello card. The hooks that enforce those rules at write/move time live in `Research_Hooks.md`. Methodology lives in `Research_Protocol.md`. The messaging bus lives in `Research_Coordination.md`. Identity (WHO) lives in `../Research_Role.md`.
+Card mechanics for the Research role. This file answers **HOW (cards)** — every procedural rule for assembling a card. The hooks that enforce those rules at write/move time live in `Research_Hooks.md`. Methodology lives in `Research_Protocol.md`. The messaging bus lives in `Research_Coordination.md`. Identity (WHO) lives in `../Research_Role.md`.
 
 ---
 
@@ -43,14 +43,14 @@ Child cards: `#105.1 API Routes`, `#105.2 UI Components`. Mark the parent with `
 Card titles follow this format, the same for every role:
 
 ```
-#<idShort> <title> <24-char Trello ID>
+#<idShort> <title> <24-char card id>
 ```
 
 Examples (the id shown is illustrative — always use the card's real one):
 - `#12 Example Card Title 6a4d1318bfeec5789719abcd`
 - `#47 Add upstream-API integration 6a4d1318bfeec578971901ef`
 
-The Trello API ID is the card's internal 24-char `id` field (distinct from the short `idShort` Trello displays) — 24 hex characters, not a name.
+The card id is the card's internal 24-char `id` field (distinct from the short `idShort` the board displays) — 24 hex characters, not a name.
 
 A trailing worktree tag is **optional**, and only useful when a board spans more than one worktree. When one is present, `gate-card-title.sh` checks it against `board_tag` in `protocol-enforcement.conf`.
 

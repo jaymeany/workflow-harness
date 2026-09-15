@@ -38,7 +38,7 @@ Protocol and role docs are also preloaded into session context by SessionStart h
 >
 >**There is no messaging bus.** Peers are reached directly: `ListAgents` to see who is running, `SendMessage` to talk to them. See `load-agent-comms.sh`.
 >
->**Arm exactly one Monitor per session:** the Trello column watcher from `load-dev-trello-catchup.sh`. Nothing else.
+>**Arm exactly one Monitor per session:** the board column watcher from `load-dev-trello-catchup.sh`. Nothing else.
 
 ## Hooks (installed in `./.claude/hooks/`)
 

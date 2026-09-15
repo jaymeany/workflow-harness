@@ -32,8 +32,13 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 0
 fi
 
-# The project board, set during setup. See the walk-up project CLAUDE.md § Trello.
-TRELLO_BOARD_ID="{{TRELLO_BOARD_ID}}"
+# The board layer: the board id, the column rule and the watcher loop.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
+
+# The project board, set during setup in board/board.conf.
+TRELLO_BOARD_ID="${BOARD_ID}"
 TRELLO_TOK="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
 WATCH_TAG="trello-list-watch-qa-{{PROJECT_SLUG}}"
 
@@ -74,47 +79,7 @@ Call the Monitor tool with persistent: true, timeout_ms: 300000 (the schema
 requires the field; it is ignored while persistent), description \"card
 arrivals in {{PROJECT_NAME}} QA column\", and this command:
 
-WATCH_TAG=\"${WATCH_TAG}\"
-BOARD=\"${TRELLO_BOARD_ID}\"
-WORD_RE='(^|[^a-z0-9])qa([^a-z0-9]|\$)'
-TOK=\"\${TRELLO_API_TOKEN:-\$TRELLO_TOKEN}\"
-LIST=\"\"
-warned=0
-seen=\"\"
-first=1
-while true; do
-  if [ -z \"\$LIST\" ]; then
-    LIST=\$(curl -sf --max-time 10 -G \"https://api.trello.com/1/boards/\$BOARD/lists\" --data-urlencode \"fields=name\" --data-urlencode \"key=\$TRELLO_API_KEY\" --data-urlencode \"token=\$TOK\" 2>/dev/null | jq -r --arg re \"\$WORD_RE\" '[.[] | select(.name | test(\$re; \"i\"))][0].id // empty' 2>/dev/null) || LIST=\"\"
-    if [ -z \"\$LIST\" ]; then
-      if [ \"\$warned\" -eq 0 ]; then
-        echo \"TRELLO watcher: no column found on board \$BOARD yet, or Trello did not answer. Retrying every 20s.\"
-        warned=1
-      fi
-      sleep 20
-      continue
-    fi
-  fi
-  out=\$(curl -sf --max-time 10 -G \"https://api.trello.com/1/lists/\$LIST/cards\" --data-urlencode \"fields=idShort,name\" --data-urlencode \"key=\$TRELLO_API_KEY\" --data-urlencode \"token=\$TOK\" 2>/dev/null) || out=\"\"
-  if [ -n \"\$out\" ]; then
-    if lines=\$(printf '%s' \"\$out\" | jq -r '.[] | (.idShort|tostring) as \$n | (if (.name|startswith(\"#\"+\$n+\" \")) then .name else \"#\"+\$n+\" \"+.name end) as \$t | .id + \" \" + \$t' 2>/dev/null); then
-      cur=\"\"
-      while IFS= read -r line; do
-        [ -n \"\$line\" ] || continue
-        id=\"\${line%% *}\"
-        cur=\"\$cur|\$id|\"
-        case \"\$seen\" in *\"|\$id|\"*) continue ;; esac
-        if [ \"\$first\" -eq 1 ]; then
-          echo \"TRELLO in-column at boot: \${line#* }\"
-        else
-          echo \"TRELLO card arrival: \${line#* } (detected \$(date -u +%H:%M:%SZ))\"
-        fi
-      done <<< \"\$lines\"
-      seen=\"\$cur\"
-      first=0
-    fi
-  fi
-  sleep 20
-done
+$(board_watch_command "$WATCH_TAG" "$TRELLO_BOARD_ID" "$(board_column_regex qa)")
 
 Discipline notes — do not 'simplify' these:
 - zsh-safe by construction: no globs anywhere.

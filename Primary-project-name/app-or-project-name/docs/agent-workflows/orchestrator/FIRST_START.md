@@ -196,6 +196,8 @@ Search for `{{` in these places and fill every value:
 - `app-or-project-name/CLAUDE.md`
 - `app-or-project-name/docs/CLAUDE.md`
 - every `CLAUDE.md`, `.md` doc and `.claude/hooks/` file under `docs/agent-workflows/`
+- `docs/agent-workflows/board/board.conf`. The hooks read the board id from
+  here. Leave it unfilled and every board gate quietly allows everything.
 
 This file, `FIRST_START.md`, keeps its placeholders. It is the script, not configuration.
 
@@ -218,6 +220,7 @@ This file, `FIRST_START.md`, keeps its placeholders. It is the script, not confi
 | `{{SERVICE_REGISTRY}}`, `{{TEST_SUITE}}` | Where each is, or `None.` |
 | `{{REVIEW_BAR}}`, `{{BOUNDARIES}}` | What done looks like, and what must never appear |
 | `{{TRELLO_BOARD_NAME}}`, `{{TRELLO_BOARD_ID}}` | The board from step 3 |
+| `{{BOARD_ID}}` in `board/board.conf` | The same board id. This is the one the hooks read |
 | `{{LIST_ID_NEXT}}`, `{{LIST_ID_RESEARCH}}`, `{{LIST_ID_DESIGN}}` | The list IDs from step 3 |
 | `{{LIST_ID_NOW}}`, `{{LIST_ID_QA}}`, `{{LIST_ID_DONE}}` | The list IDs from step 3 |
 | `{{TOOLS}}` | The optional tools in use, from step 5 |

@@ -52,34 +52,41 @@
 # blips should not block legitimate work. The discipline lives in §5 DoD as
 # prose, so the agent self-enforces when the hook can't.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v git >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
+hook_read_action
+if [[ "$HOOK_ACTION" != "move" ]]; then
   exit 0
 fi
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-dest_list_id=$(echo "$input" | jq -r '.tool_input.listId // empty')
+card_id="$HOOK_CARD_ID"
+dest_list_id="$HOOK_DEST_STAGE_ID"
 [[ -z "$card_id" || -z "$dest_list_id" ]] && exit 0
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-[[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]] && exit 0
+board_credentials_present || exit 0
 
-# Only fire when moving INTO the QA column.
-list=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${dest_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-dest_list_name=$(echo "$list" | jq -r '.name // empty' | tr '[:upper:]' '[:lower:]')
+# Only fire when moving INTO the QA column, found with the board layer's
+# column rule ("QA", "QA/QC" and "Ready for QA" all count).
+board_stage_get list "$dest_list_id"
+dest_list_name=""
+if [[ -n "$list" ]]; then
+  dest_list_name=$(printf '%s' "$list" | jq -r '.name // empty')
+fi
 
 [[ -z "$dest_list_name" ]] && exit 0
-# Substring match on "qa" (a board's column may be "QA" or "Ready for QA"),
-# consistent with check-now-on-ready-for-qa.sh and gate-implementation-notes.sh.
-case "$dest_list_name" in *qa*) ;; *) exit 0 ;; esac
+board_column_is "$dest_list_name" qa || exit 0
 
 # Escape hatch: cards whose work produces NO committable diff.
 #
@@ -123,10 +130,13 @@ fi
 # the worktree as their last token, but stale titles drift (e.g., a card
 # moved from the dev board to the feature board keeps "dev" in its title).
 # The board name doesn't drift.
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=name,idShort,idBoard&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-card_name=$(echo "$card" | jq -r '.name // empty')
-card_number=$(echo "$card" | jq -r '.idShort // empty')
-card_board_id=$(echo "$card" | jq -r '.idBoard // empty')
+board_card_get card "$card_id"
+card_name=""
+card_number=""
+if [[ -n "$card" ]]; then
+  card_name=$(printf '%s' "$card" | jq -r '.title // empty')
+  card_number=$(printf '%s' "$card" | jq -r '.number // empty')
+fi
 
 [[ -z "$card_name" || -z "$card_number" ]] && exit 0
 

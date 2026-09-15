@@ -46,7 +46,7 @@ If you need to re-read any of the above mid-session, use `Read` directly.
 >
 >**There is no messaging bus.** Peers are reached with `ListAgents` and `SendMessage`. See `load-agent-comms.sh`.
 >
->**Arm exactly one Monitor per session:** the Trello column watcher.
+>**Arm exactly one Monitor per session:** the board column watcher.
 
 ## Handoffs
 

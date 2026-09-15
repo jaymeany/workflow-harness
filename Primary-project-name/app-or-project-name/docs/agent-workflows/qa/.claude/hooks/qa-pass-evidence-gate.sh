@@ -54,59 +54,70 @@
 #
 # Fails open (allow) if jq/curl/env missing, same posture as siblings.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: move
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__move_card" ]]; then
+hook_read_action
+if [[ "$HOOK_ACTION" != "move" ]]; then
   exit 0
 fi
 
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
-dest_list_id=$(echo "$input" | jq -r '.tool_input.listId // empty')
+card_id="$HOOK_CARD_ID"
+dest_list_id="$HOOK_DEST_STAGE_ID"
 if [[ -z "$card_id" || -z "$dest_list_id" ]]; then
   exit 0
 fi
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
+board_credentials_present || exit 0
 
-# Source list filter — only QA.
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idList&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '{}')
-source_list_id=$(echo "$card" | jq -r '.idList // empty')
+# Source column filter — only QA.
+board_card_get card "$card_id"
+source_list_id=""
+if [[ -n "$card" ]]; then
+  source_list_id=$(printf '%s' "$card" | jq -r '.stage_id // empty')
+fi
 if [[ -z "$source_list_id" ]]; then
   exit 0
 fi
 
-source_list_name=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${source_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null \
-  | jq -r '.name // empty' \
-  | tr '[:upper:]' '[:lower:]')
+board_stage_get source_list "$source_list_id"
+source_list_name=""
+if [[ -n "$source_list" ]]; then
+  source_list_name=$(printf '%s' "$source_list" | jq -r '.name // empty')
+fi
 
-if ! printf '%s' "$source_list_name" | grep -qiE '(^|[^[:alnum:]])qa([^[:alnum:]]|$)'; then
+if ! board_column_is "$source_list_name" qa; then
   exit 0
 fi
 
 # Destination filter — only Done. FAIL/BOUNCE moves carry no Done deliverable.
-dest_list_name=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${dest_list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null \
-  | jq -r '.name // empty' \
-  | tr '[:upper:]' '[:lower:]')
+board_stage_get dest_list "$dest_list_id"
+dest_list_name=""
+if [[ -n "$dest_list" ]]; then
+  dest_list_name=$(printf '%s' "$dest_list" | jq -r '.name // empty')
+fi
 
-if ! printf '%s' "$dest_list_name" | grep -qiE '(^|[^[:alnum:]])done([^[:alnum:]]|$)'; then
+if ! board_column_is "$dest_list_name" done; then
   exit 0
 fi
 
 # Pull QA review comments, newest first.
-comments=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}/actions?filter=commentCard&limit=50&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" || echo '[]')
+board_card_notes comments "$card_id" 50
+comments="${comments:-[]}"
 
 latest_qa=$(echo "$comments" | jq -r '
-  [.[] | select(.data.text != null and (.data.text | startswith("## QA Review")))][0].data.text // empty
+  [.[] | select(.text != null and (.text | startswith("## QA Review")))][0].text // empty
 ')
 
 if [[ -z "$latest_qa" ]]; then

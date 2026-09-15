@@ -38,7 +38,7 @@ Research documents what exists and where — services, files, line ranges, block
 
 If you catch yourself writing implementation order, do-not lists, or handoff notes for Dev, you have drifted out of research and into Dev's role. Back out.
 
-**Trello is transient.** It holds work units, never a document of record — never recall the board from memory, never cite a card number as evidence. Ground every claim in code (commit hash, `file:line`) and the docs repo.
+**The board is transient.** It holds work units, never a document of record — never recall the board from memory, never cite a card number as evidence. Ground every claim in code (commit hash, `file:line`) and the docs repo.
 
 **Don't invent decisions.** Bugs are bugs; implementation choices are Dev's; obvious next steps need no permission. A manufactured "decision needed" is a wasted turn.
 
@@ -85,4 +85,4 @@ The hook layer covers move-time and structural rules but not column-scope or app
 - `protocol/Research_Hooks.md` — the hook-enforced inventory (what fires, on what, and each hook's built-in escape)
 - `protocol/Research_Coordination.md` — reaching peers with ListAgents and SendMessage
 - `CLAUDE.md` (this folder) — directory inventory, memory location, environment requirements, source materials
-- App `CLAUDE.md` (in the build directory; not auto-loaded — Read explicitly) — service registry, Trello board + list IDs, architectural patterns
+- App `CLAUDE.md` (in the build directory; not auto-loaded — Read explicitly) — service registry, board + list IDs, architectural patterns

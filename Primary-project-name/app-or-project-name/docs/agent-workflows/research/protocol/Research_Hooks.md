@@ -16,8 +16,8 @@ Structural rules for research cards are enforced by hooks in `.claude/hooks/`, c
 - `gate-card-structure.sh` — on `update_card_details` / `add_card_to_list` / `move_card`: file-count cap (>3 files across "Files to Modify" + "Files to Create" requires a `Parent:` / `Children:` reference) and required sections when `## Research Complete` is declared (Services Discovered/Verified gap, Files/Acceptance, Confidence — the same set `lib.sh` checks). Rules sourced from `protocol-enforcement.conf`. (Does **not** enforce a header allowlist, despite older docs — only the file-cap and required-section checks.)
 - `gate-column-scope.sh` — on `update_card_details`: enforces the Hard Constraint that Research writes only to cards currently in the Research column. Fetches the card's `idList`, looks up the list name, and denies if `is_research_column` (lib.sh) doesn't match — i.e. if the name doesn't contain the word *research*. **Exception:** a "Now" card may take a description-only strict append headed `## Research Addendum`, so Dev reads corrections in context at pickup. QA/Done stay blocked. Fails open on missing tools/env/api.
 - `gate-description-append-only.sh` — on `update_card_details` when `tool_input.description` is set: fetches the current description and denies the write unless the new description contains the current description as a substring (i.e., it's a strict append). Backstops the Hard Constraint that the card description is the work history; wholesale replacement would wipe it. Fails open on missing env/api. **Override:** also fails open (allows a full rewrite) while the card is still in the Research column — an in-column correction isn't a wipe, so the gate only re-engages after handoff. A clean rewrite of an in-column card needs no workaround; just write it.
-- `deny-trello-comments.sh` — on `add_comment` / `update_comment` / `delete_comment`: denies all Trello comment writes. Backstops the Hard Constraint that Research findings go in the description, not comments.
-- `deny-direct-trello-api.sh` — on `Bash`: rejects `curl`/`wget` to `api.trello.com`. Forces Trello operations through `mcp__trello__*` so the other hooks fire.
+- `deny-trello-comments.sh` — on `add_comment` / `update_comment` / `delete_comment`: denies all board comment writes. Backstops the Hard Constraint that Research findings go in the description, not comments.
+- `deny-direct-trello-api.sh` — on `Bash`: rejects `curl`/`wget` to `api.trello.com`. Forces board operations through `mcp__trello__*` so the other hooks fire.
 
 
 ### PostToolUse
@@ -33,10 +33,10 @@ Structural rules for research cards are enforced by hooks in `.claude/hooks/`, c
 
 Two further SessionStart hooks load *state*, not docs, and are excluded from the digest (their size varies with inbox/board contents):
 
-- `load-agent-comms.sh` — states that peers are reached with `ListAgents` and `SendMessage`, that there is no bus, and that the Trello column watcher is the only Monitor to arm.
-- `load-research-trello-catchup.sh` — emits the column-matching rule and instructs the session to arm the **Trello column watcher** Monitor. The hook makes no Trello call; the watcher finds the Research list id on its first poll.
+- `load-agent-comms.sh` — states that peers are reached with `ListAgents` and `SendMessage`, that there is no bus, and that the board column watcher is the only Monitor to arm.
+- `load-research-trello-catchup.sh` — emits the column-matching rule and instructs the session to arm the **board column watcher** Monitor. The hook makes no board call; the watcher finds the Research list id on its first poll.
 
-Arm the Trello column watcher Monitor as your first action each session. It is the wake signal for new cards; do not replace it with a `/loop` polling command.
+Arm the board column watcher Monitor as your first action each session. It is the wake signal for new cards; do not replace it with a `/loop` polling command.
 
 One loader per file, split semantically (identity / methodology / cards / coordination). Claude Code's `additionalContext` caps around ~10K chars per hook; over-cap content is persisted to disk and substituted with a small preview, so keeping each file under the cap means each loader inlines its doc in full. `load-status-digest.sh` runs last in `SessionStart` and reports OK or WARN; a WARN means a file crossed the cap and the fix is a further semantic split, never byte-range slicing inside a loader.
 

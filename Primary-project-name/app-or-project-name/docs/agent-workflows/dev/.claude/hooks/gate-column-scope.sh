@@ -45,44 +45,42 @@
 # should not block legitimate work. The constraint also lives in prose
 # (Dev_Role.md) so the agent can self-enforce when the hook can't.
 
+# Requires-Path: ../board/board.sh
+# Board-Actions: update
+
 set -euo pipefail
 
 if ! command -v jq >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
   exit 0
 fi
 
-TRELLO_TOKEN_VALUE="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-if [[ -z "${TRELLO_API_KEY:-}" || -z "$TRELLO_TOKEN_VALUE" ]]; then
-  exit 0
-fi
+# The board layer: tool names, board calls and the column rule.
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
+[[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
+board_credentials_present || exit 0
 
-input=$(cat)
-tool_name=$(echo "$input" | jq -r '.tool_name // empty')
+hook_read_action
+[[ "$HOOK_ACTION" == "update" ]] || exit 0
 
-if [[ "$tool_name" != "mcp__trello__update_card_details" ]]; then
-  exit 0
-fi
-
-card_id=$(echo "$input" | jq -r '.tool_input.cardId // empty')
+card_id="$HOOK_CARD_ID"
 [[ -z "$card_id" ]] && exit 0
 
-# Fetch card's current list and name.
-card=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idList,name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-list_id=$(echo "$card" | jq -r '.idList // empty')
-card_name=$(echo "$card" | jq -r '.name // empty')
-
-# Card lookup failed — fail open (don't block on transient API issues).
+# Fetch the card's current column and name. A failed lookup fails open.
+board_card_get card "$card_id"
+[[ -n "$card" ]] || exit 0
+list_id=$(printf '%s' "$card" | jq -r '.stage_id // empty')
+card_name=$(printf '%s' "$card" | jq -r '.title // empty')
 [[ -z "$list_id" ]] && exit 0
 
-# Look up the list's name.
-list=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${list_id}?fields=name&key=${TRELLO_API_KEY}&token=${TRELLO_TOKEN_VALUE}" 2>/dev/null || echo '{}')
-list_name=$(echo "$list" | jq -r '.name // empty')
-
-# List lookup failed — fail open.
+# Look up the column's name. A failed lookup fails open.
+board_stage_get list "$list_id"
+[[ -n "$list" ]] || exit 0
+list_name=$(printf '%s' "$list" | jq -r '.name // empty')
 [[ -z "$list_name" ]] && exit 0
 
-# Allow if the card is in Dev's column (any list whose name says "now").
-if echo "$list_name" | grep -qiE '(^|[^[:alnum:]])now([^[:alnum:]]|$)'; then
+# Allow if the card is in Dev's column.
+if board_column_is "$list_name" now; then
   exit 0
 fi
 

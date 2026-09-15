@@ -5,14 +5,15 @@
 # Sourced by:
 #   - gate-research-complete.sh
 #   - apply-research-complete-label.sh
-#   - gate-column-scope.sh
-#   - gate-description-append-only.sh
 #
 # Both hooks need the same two operations: deciding whether a description
-# qualifies as research-complete, and attaching the green "Research complete"
-# label to a card. Keeping these in one place prevents the criteria from
-# drifting between create-time (apply-research-complete-label.sh) and
-# update/move-time (gate-research-complete.sh).
+# qualifies as research-complete, and attaching the "Research complete" label
+# to a card. Keeping these in one place prevents the criteria from drifting
+# between create-time (apply-research-complete-label.sh) and update/move-time
+# (gate-research-complete.sh).
+#
+# Board access goes through the board layer (../../../board/board.sh), which
+# this file loads. Callers check BOARD_LOADED after sourcing.
 #
 # This file is sourced, not executed — no shebang behavior is invoked, but
 # the line is kept so editors syntax-highlight as bash and bash -n works.
@@ -20,36 +21,14 @@
 # Required by callers:
 #   - bash >= 3.2 (macOS /bin/bash compatible)
 #   - jq, curl on PATH (callers exit 0 if missing; lib does not re-check)
-#   - TRELLO_API_KEY, TRELLO_API_TOKEN/TRELLO_TOKEN env vars (caller-checked)
 #
 # All functions are pure with respect to caller state — they do not modify
-# globals, only echo or perform side-effectful HTTP calls.
+# globals, only echo or perform side-effectful board calls.
 
-# ============================================================================
-# is_research_column <list-name>
-#
-# True if the list name denotes Research's column. Plain case-insensitive
-# SUBSTRING match — any name containing "research" passes: "Research",
-# "Research and prep", "Research & Prep", "Researching", "Pre-research".
-#
-# Deliberately NOT an exact match. The board's column label is cosmetic and
-# gets renamed; the role's identity is not. An anchored '^research and prep$'
-# meant a one-word relabel silently took the whole role offline: every
-# description write denied by gate-column-scope, every handoff advance
-# skipped by advance_card_to_now. The column is whichever one says research.
-#
-# Relaxed from a word-boundary regex to substring. The boundary version excluded "Researcher notes" on purpose,
-# but that exclusion protected nothing: there is no plausible column whose
-# name contains "research" that is NOT Research's column, so the boundary
-# only created new ways for a rename to break the role — the exact failure
-# the non-anchored match exists to prevent.
-#
-# Callers pass a name that may be empty (API failure) — empty returns false,
-# and every caller fails open on empty before reaching here.
-# ============================================================================
-is_research_column() {
-  printf '%s' "${1:-}" | grep -qi 'research'
-}
+if [[ "${BOARD_LOADED:-}" != "1" ]]; then
+  # shellcheck disable=SC1091
+  source "$(dirname "${BASH_SOURCE[0]}")/../../../board/board.sh" 2>/dev/null || true
+fi
 
 # ============================================================================
 # evaluate_research_complete <description>
@@ -169,52 +148,33 @@ evaluate_research_complete() {
 # ============================================================================
 # attach_research_complete_label <card_id>
 #
-# Best-effort: looks up the card's board, finds (or creates) a green label
-# named "Research complete", and attaches it to the card. Idempotent —
-# Trello silently ignores duplicate label attachments.
+# Best-effort: looks up the card's board, finds (or creates) the board's
+# "Research complete" label, and attaches it to the card. The board adapter
+# decides how that label is found; on Trello it is the green label, matched by
+# color only. Idempotent — the board ignores duplicate label attachments.
+#
+# A failed label lookup counts as "no label", so the label is created.
 #
 # Always returns 0. Failures (network, missing board, label-create denied)
 # are swallowed because label attachment is decoration, not enforcement.
 # ============================================================================
 attach_research_complete_label() {
-  local card_id="$1"
-  local trello_token="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-  if [[ -z "${TRELLO_API_KEY:-}" || -z "$trello_token" ]]; then
-    return 0
-  fi
+  local card_id="$1" card="" board_id="" labels="" label_id=""
+  board_credentials_present || return 0
 
-  local card_json board_id
-  card_json=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idBoard&key=${TRELLO_API_KEY}&token=${trello_token}" 2>/dev/null || echo '{}')
-  board_id=$(echo "$card_json" | jq -r '.idBoard // empty' 2>/dev/null || echo "")
-  if [[ -z "$board_id" ]]; then
-    return 0
-  fi
+  board_card_get card "$card_id"
+  [[ -n "$card" ]] || return 0
+  board_id=$(printf '%s' "$card" | jq -r '.board_id // empty' 2>/dev/null || echo "")
+  [[ -n "$board_id" ]] || return 0
 
-  # Find the board's green label, or create one if absent.
-  #
-  # Matched by COLOR ONLY. Label semantics on these boards are carried by the
-  # color; every label except green is unnamed, and green's name is one click
-  # from being cleared in the Trello UI with no guard. A name predicate that
-  # stops matching does not fail loudly here — it falls through to the create
-  # branch below and MINTS A DUPLICATE green label, which is the same defect
-  # already fixed on QA's purple and blue selectors.
-  local labels label_id
-  labels=$(curl -s --max-time 5 "https://api.trello.com/1/boards/${board_id}/labels?key=${TRELLO_API_KEY}&token=${trello_token}" 2>/dev/null || echo '[]')
-  label_id=$(printf '%s' "$labels" | jq -r '.[] | select(.color=="green") | .id' 2>/dev/null | head -n1)
+  board_labels labels "$board_id"
+  board_state_label_pick label_id "${labels:-[]}" research_complete
   if [[ -z "$label_id" ]]; then
-    local created
-    created=$(curl -s --max-time 5 -X POST \
-      "https://api.trello.com/1/labels?name=Research%20complete&color=green&idBoard=${board_id}&key=${TRELLO_API_KEY}&token=${trello_token}" 2>/dev/null || echo '{}')
-    label_id=$(printf '%s' "$created" | jq -r '.id // empty')
+    board_label_create label_id "$board_id" research_complete
   fi
-  if [[ -z "$label_id" ]]; then
-    return 0
-  fi
+  [[ -n "$label_id" ]] || return 0
 
-  curl -s --max-time 5 -X POST \
-    "https://api.trello.com/1/cards/${card_id}/idLabels?value=${label_id}&key=${TRELLO_API_KEY}&token=${trello_token}" \
-    >/dev/null 2>&1 || true
-
+  board_card_label_add "$card_id" "$label_id"
   return 0
 }
 
@@ -222,88 +182,67 @@ attach_research_complete_label() {
 # advance_card_to_now <card_id>
 #
 # If the card is currently in Research's column, move it to the same
-# board's "Now" list. Best-effort — silent on failure. Idempotent: a card
+# board's "Now" column. Best-effort — silent on failure. Idempotent: a card
 # already outside Research's column is unchanged.
 #
 # Why this exists: research-complete is a transition state, not just a
 # label. When a card crosses the bar (lead's update, QA-card review, or
 # create-time post-attach), the workflow promotes it to Dev's column
-# automatically. This is one of the oldest functions in the role layer —
-# the lead doesn't issue an explicit move_card; reaching research-complete
-# IS the handoff signal. Companion to attach_research_complete_label;
-# called from the same `ok` paths.
+# automatically. The lead doesn't issue an explicit move_card; reaching
+# research-complete IS the handoff signal. Companion to
+# attach_research_complete_label; called from the same `ok` paths.
 #
-# Match by list name (via is_research_column) rather than ID so the function
-# works across the main board and any feature-worktree boards that share
-# column naming. Mirrors gate-column-scope.sh's name-match approach.
+# Columns are found by name, with the board layer's column rule.
 #
-# Always returns 0. Failures (network, missing list, API denial) are
+# Always returns 0. Failures (network, missing column, API denial) are
 # swallowed so the auto-advance behavior never blocks the calling hook.
 # ============================================================================
 advance_card_to_now() {
-  local card_id="$1"
-  local trello_token="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-  if [[ -z "${TRELLO_API_KEY:-}" || -z "$trello_token" ]]; then
-    return 0
-  fi
+  local card_id="$1" card="" id_list="" id_board="" list="" current_name="" lists="" now_list_id=""
+  board_credentials_present || return 0
 
-  # Fetch the card's current list and board.
-  local card_json id_list id_board
-  card_json=$(curl -s --max-time 5 "https://api.trello.com/1/cards/${card_id}?fields=idList,idBoard&key=${TRELLO_API_KEY}&token=${trello_token}" 2>/dev/null || echo '{}')
-  id_list=$(echo "$card_json" | jq -r '.idList // empty' 2>/dev/null || echo "")
-  id_board=$(echo "$card_json" | jq -r '.idBoard // empty' 2>/dev/null || echo "")
+  # Fetch the card's current column and board.
+  board_card_get card "$card_id"
+  [[ -n "$card" ]] || return 0
+  id_list=$(printf '%s' "$card" | jq -r '.stage_id // empty' 2>/dev/null || echo "")
+  id_board=$(printf '%s' "$card" | jq -r '.board_id // empty' 2>/dev/null || echo "")
   if [[ -z "$id_list" || -z "$id_board" ]]; then
     return 0
   fi
 
-  # Confirm the card is in Research's column. If not, do not advance —
-  # the function is a no-op outside that column.
-  local current_list_json current_name
-  current_list_json=$(curl -s --max-time 5 "https://api.trello.com/1/lists/${id_list}?fields=name&key=${TRELLO_API_KEY}&token=${trello_token}" 2>/dev/null || echo '{}')
-  current_name=$(echo "$current_list_json" | jq -r '.name // empty' 2>/dev/null || echo "")
-  if ! is_research_column "$current_name"; then
-    return 0
+  # Confirm the card is in Research's column. If not, do not advance.
+  board_stage_get list "$id_list"
+  if [[ -n "$list" ]]; then
+    current_name=$(printf '%s' "$list" | jq -r '.name // empty' 2>/dev/null || echo "")
   fi
+  board_column_is "$current_name" research || return 0
 
-  # Find the "Now" list on the same board (case-insensitive name match).
-  local lists_json now_list_id
-  lists_json=$(curl -s --max-time 5 "https://api.trello.com/1/boards/${id_board}/lists?fields=name&key=${TRELLO_API_KEY}&token=${trello_token}" 2>/dev/null || echo '[]')
-  now_list_id=$(printf '%s' "$lists_json" | jq -r '.[] | select(.name | ascii_downcase | test("(^|[^a-z0-9])now([^a-z0-9]|$)")) | .id' 2>/dev/null | head -n1)
-  if [[ -z "$now_list_id" ]]; then
-    return 0
-  fi
+  # Find the Now column on the same board.
+  board_stages lists "$id_board"
+  [[ -n "$lists" ]] || return 0
+  now_list_id=$(printf '%s' "$lists" | jq -r --arg re "$(board_column_regex now)" \
+    '[.[] | select(.name | test($re; "i"))][0].id // empty' 2>/dev/null || echo "")
+  [[ -n "$now_list_id" ]] || return 0
 
-  # Move the card. Trello accepts PUT /cards/{id}/idList?value=<list-id>.
-  curl -s --max-time 5 -X PUT \
-    "https://api.trello.com/1/cards/${card_id}/idList?value=${now_list_id}&key=${TRELLO_API_KEY}&token=${trello_token}" \
-    >/dev/null 2>&1 || true
-
+  board_card_move "$card_id" "$now_list_id"
   return 0
 }
 
 # ============================================================================
 # find_research_complete_label_id <board_id>
 #
-# Echoes the board's green "Research complete" label id, or empty string if
-# the label doesn't exist. Used by gate-research-complete.sh to detect the
+# Echoes the board's "Research complete" label id, or empty string if the
+# label doesn't exist. Used by gate-research-complete.sh to detect the
 # "attach via tool_input.labels" bypass attempt.
 #
 # Does NOT create the label — read-only. Use attach_research_complete_label
 # when you actually want to attach (which create-on-miss is part of).
 # ============================================================================
 find_research_complete_label_id() {
-  local board_id="$1"
-  local trello_token="${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
-  if [[ -z "${TRELLO_API_KEY:-}" || -z "$trello_token" || -z "$board_id" ]]; then
-    return 0
-  fi
-  local labels
-  labels=$(curl -s --max-time 5 "https://api.trello.com/1/boards/${board_id}/labels?key=${TRELLO_API_KEY}&token=${trello_token}" 2>/dev/null || echo '[]')
-  # Matched by COLOR ONLY — see attach_research_complete_label above. This path
-  # has no create branch: a miss returns empty, and gate-research-complete.sh's
-  # sole use of it treats empty as "not adding the label" and exits 0 (allow).
-  # So a name predicate that stops matching does not deny and does not warn —
-  # the green label lands, evaluate_research_complete never runs, and the card
-  # is stranded in the Research column looking handed off. Keep this color-only.
-  printf '%s' "$labels" | jq -r '.[] | select(.color=="green") | .id' 2>/dev/null | head -n1
+  local board_id="$1" labels="" label_id=""
+  board_credentials_present || return 0
+  [[ -n "$board_id" ]] || return 0
+  board_labels labels "$board_id"
+  board_state_label_pick label_id "${labels:-[]}" research_complete
+  printf '%s' "$label_id"
 }
