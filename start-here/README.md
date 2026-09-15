@@ -7,14 +7,15 @@ Code session with one job:
 
 | Agent | Job | Trello column |
 |---|---|---|
-| Orchestrator | Plans the work and writes the cards | Next |
+| Orchestrator | Plans the work and writes the cards | None. It works across the board |
 | Research | Documents what exists and what a card needs | Research |
 | Designer | Builds the surfaces | Design |
 | Dev | Writes the code | Now |
-| QA | Checks the work and moves cards to Done | QA, Done |
+| QA | Checks the work, then moves a card to Done or sends it back | QA |
 
 The agents pass work along the Trello board. Hooks, small scripts that run inside Claude Code, keep each
-agent in its lane. Dev cannot mark its own work done. Every agent writes notes for its next session.
+agent in its lane. Dev hands finished work to QA, and QA decides when it's done. Every agent writes notes for
+its next session.
 
 You decide what gets built. When a decision is yours, an agent asks.
 
