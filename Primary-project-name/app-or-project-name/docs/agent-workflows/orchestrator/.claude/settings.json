@@ -6,6 +6,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-first-start-check.sh",
+            "$comment": "First start: while any {{placeholder}} remains, tells the session to run FIRST_START.md before anything else. Silent once setup is done."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-orchestrator-role.sh",
             "$comment": "Loads load-orchestrator-role.sh at session start."
           },
