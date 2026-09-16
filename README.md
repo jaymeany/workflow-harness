@@ -23,8 +23,8 @@ choices. You may have your own tooling for the same problems, and that's fine.
 | UI and interaction work has to be judged on the real thing | Storybook. It renders the project's real components, so what an agent sees is what ships |
 | Review has to see the product the way a user does | Playwright MCP. It opens the product in a real browser for screenshots and checks |
 
-Trello is built into the hooks, so replacing it means changing them. Storybook, Axon and Playwright MCP are
-optional.
+Trello sits behind an adapter, so swapping it is a new adapter, not a rewrite. See "Use another board"
+below. Storybook, Axon and Playwright MCP are optional.
 
 ## Why the code holds up
 
@@ -228,6 +228,24 @@ The harness fits your project, and it's built to be changed.
   the header convention is covered.
 - Setup is a script. The files ship with placeholders, and the orchestrator fills them in with you. Until it
   does, every other role refuses to work and tells you to start the orchestrator.
+
+### Use another board
+
+Trello is the adapter that ships. The hooks never call it directly. They call the board layer:
+
+```
+docs/agent-workflows/board/
+├── board.conf          the adapter in use, and the board id
+├── CONTRACT.md         what an adapter must provide
+└── adapters/trello/    tool names, board calls, state labels, the watcher loop
+```
+
+To move to another board, add a folder beside `adapters/trello/` and name it in `board.conf`. `CONTRACT.md`
+lists what an adapter provides: read a card, read a column, list the cards in a column, read a card's notes,
+find or create the state labels, move a card, rename it, add and remove labels.
+
+The rest is shared and stays put, including the column rule, the reader that turns a tool call into a board
+action, and the watcher. The hooks don't change.
 
 ## What you need
 
