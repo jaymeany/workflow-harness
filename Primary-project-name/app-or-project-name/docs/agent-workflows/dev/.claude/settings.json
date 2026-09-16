@@ -3,7 +3,16 @@
   "hooks": {
     "SessionStart": [
       {
-        "$comment": "Preload Dev_Role.md (role briefing) in full. Dumb file loader \u2014 reads the file as-is and emits via additionalContext. The app CLAUDE.md is in a sibling tree off the walk-up path and is NOT auto-loaded; Read it explicitly when working on app code.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-first-start-check.sh",
+            "$comment": "First start: while any {{placeholder}} remains, tells the session to send the user to the orchestrator and do no work. Silent once setup is done."
+          }
+        ]
+      },
+      {
+        "$comment": "Preload Dev_Role.md (role briefing) in full. Dumb file loader — reads the file as-is and emits via additionalContext. The app CLAUDE.md is in a sibling tree off the walk-up path and is NOT auto-loaded; Read it explicitly when working on app code.",
         "hooks": [
           {
             "type": "command",
@@ -12,7 +21,7 @@
         ]
       },
       {
-        "$comment": "Preload Dev_Protocol.md (pre-implementation methodology \u2014 verify research, registry, todos) in full. Dumb file loader.",
+        "$comment": "Preload Dev_Protocol.md (pre-implementation methodology — verify research, registry, todos) in full. Dumb file loader.",
         "hooks": [
           {
             "type": "command",
@@ -39,7 +48,7 @@
         ]
       },
       {
-        "$comment": "Preload Dev_Build.md (\u00a74 Build Verification, \u00a710 Git Push Workflow, Hotfix Protocol) in full. Dumb file loader. \u00a73 Database Changes was split out to Dev_Database.md (load-dev-database.sh) to keep this under the ~10K-char additionalContext cap.",
+        "$comment": "Preload Dev_Build.md (§4 Build Verification, §10 Git Push Workflow, Hotfix Protocol) in full. Dumb file loader. §3 Database Changes was split out to Dev_Database.md (load-dev-database.sh) to keep this under the ~10K-char additionalContext cap.",
         "hooks": [
           {
             "type": "command",
@@ -57,7 +66,7 @@
         ]
       },
       {
-        "$comment": "Surface the dev role's Trello column queue ('Now') at session start, plus a soft-start suggestion for `/loop /check-trello 300s`. This hook never queries Trello \u2014 it only emits the reminder string; the actual column query happens in `/check-trello`, resolved by name across the board ids in the walk-down project CLAUDE.md Trello section (never the global MCP active board). Fail-open: missing jq \u2192 silent.",
+        "$comment": "Surface the dev role's Trello column queue ('Now') at session start, plus a soft-start suggestion for `/loop /check-trello 300s`. This hook never queries Trello — it only emits the reminder string; the actual column query happens in `/check-trello`, resolved by name across the board ids in the walk-down project CLAUDE.md Trello section (never the global MCP active board). Fail-open: missing jq → silent.",
         "hooks": [
           {
             "type": "command",
@@ -66,7 +75,7 @@
         ]
       },
       {
-        "$comment": "Audit every sibling hook for static fail-open conditions at session start. Discovers hooks by globbing the same directory, parses each one's `# Requires:` and `# Environment:` header lines, and validates declared CLI tools and env vars against the current shell. If any hook would silently allow tool calls because its declared preconditions are unmet, emits a loud banner (stderr + additionalContext) listing every affected hook and what's missing. Stays silent when all hooks are healthy. Agnostic \u2014 depends only on the header convention, no hardcoded hook names \u2014 so it travels with the role template into any new project.",
+        "$comment": "Audit every sibling hook for static fail-open conditions at session start. Discovers hooks by globbing the same directory, parses each one's `# Requires:` and `# Environment:` header lines, and validates declared CLI tools and env vars against the current shell. If any hook would silently allow tool calls because its declared preconditions are unmet, emits a loud banner (stderr + additionalContext) listing every affected hook and what's missing. Stays silent when all hooks are healthy. Agnostic — depends only on the header convention, no hardcoded hook names — so it travels with the role template into any new project.",
         "hooks": [
           {
             "type": "command",
@@ -75,7 +84,7 @@
         ]
       },
       {
-        "$comment": "Surface session-start doc loader status \u2014 which docs were inlined in full vs. which overflowed Claude Code's ~10K-char additionalContext cap and got persisted as a file (where the harness substitutes only a ~2KB preview, silently turning a session-start doc into a pointer). The cap itself is a harness constraint; this digest is agent-authored to make its consequence visible at every session start. Discovers doc loaders by globbing load-dev-*.sh, excluding the catchup hooks and the digest itself; re-runs each in a subshell and measures the real emitted body. Must run last so its output appears at the bottom of session-start context. Fail-open on missing jq.",
+        "$comment": "Surface session-start doc loader status — which docs were inlined in full vs. which overflowed Claude Code's ~10K-char additionalContext cap and got persisted as a file (where the harness substitutes only a ~2KB preview, silently turning a session-start doc into a pointer). The cap itself is a harness constraint; this digest is agent-authored to make its consequence visible at every session start. Discovers doc loaders by globbing load-dev-*.sh, excluding the catchup hooks and the digest itself; re-runs each in a subshell and measures the real emitted body. Must run last so its output appears at the bottom of session-start context. Fail-open on missing jq.",
         "hooks": [
           {
             "type": "command",
@@ -107,7 +116,7 @@
         ]
       },
       {
-        "$comment": "Column-scope gate. Blocks mcp__trello__update_card_details when the card's current list is not 'Now'. Backstop for Dev_Role.md \u00a7 Card Management \u00a7 Hard Constraints \u2014 Column scope. Fail-open on missing jq/curl/env.",
+        "$comment": "Column-scope gate. Blocks mcp__trello__update_card_details when the card's current list is not 'Now'. Backstop for Dev_Role.md § Card Management § Hard Constraints — Column scope. Fail-open on missing jq/curl/env.",
         "matcher": "mcp__trello__update_card_details",
         "hooks": [
           {
@@ -117,7 +126,7 @@
         ]
       },
       {
-        "$comment": "Description-write block. Denies any mcp__trello__update_card_details call where tool_input.description is set. The card description is Research's evidence chain; Dev writes only to comments via mcp__trello__add_comment per Dev_Protocol.md \u00a76. update_card_details replaces description wholesale, so any Dev write to that field destroys Research's record. Backstop for Dev_Role.md \u00a7 Card Management \u00a7 Hard Constraints \u2014 Comments, never description.",
+        "$comment": "Description-write block. Denies any mcp__trello__update_card_details call where tool_input.description is set. The card description is Research's evidence chain; Dev writes only to comments via mcp__trello__add_comment per Dev_Protocol.md §6. update_card_details replaces description wholesale, so any Dev write to that field destroys Research's record. Backstop for Dev_Role.md § Card Management § Hard Constraints — Comments, never description.",
         "matcher": "mcp__trello__update_card_details",
         "hooks": [
           {
@@ -127,7 +136,7 @@
         ]
       },
       {
-        "$comment": "Implementation Notes gate. On mcp__trello__move_card to 'Ready for QA', fetches the card's most-recent comment and validates it against the Dev_Protocol.md \u00a76 template (## Implementation Notes header + ### Services Used, Testing Done, Deviations from Research subsections). Blocks the move if no comments exist, or any required section is missing, or sections are filled only with template placeholders. Implementation Notes go in comments \u2014 the description is Research's, not Dev's. Fail-open on missing jq/curl/env or API failure.",
+        "$comment": "Implementation Notes gate. On mcp__trello__move_card to 'Ready for QA', fetches the card's most-recent comment and validates it against the Dev_Protocol.md §6 template (## Implementation Notes header + ### Services Used, Testing Done, Deviations from Research subsections). Blocks the move if no comments exist, or any required section is missing, or sections are filled only with template placeholders. Implementation Notes go in comments — the description is Research's, not Dev's. Fail-open on missing jq/curl/env or API failure.",
         "matcher": "mcp__trello__move_card",
         "hooks": [
           {
@@ -137,7 +146,7 @@
         ]
       },
       {
-        "$comment": "Per-card commit gate. On mcp__trello__move_card to 'Ready for QA', validates that the most-recent commit on the app repo's HEAD has a subject starting with #<card-number>. Enforces Dev_Protocol.md \u00a75 per-card commit discipline (the lesson captured in feedback_per_card_commits.md memory). The discipline is what lets \u00a76 drop Files Modified \u2014 QA finds the diff via `git log --grep='#<card>'` instead of reading a re-narration. Fail-open on missing tools/env/repo.",
+        "$comment": "Per-card commit gate. On mcp__trello__move_card to 'Ready for QA', validates that the most-recent commit on the app repo's HEAD has a subject starting with #<card-number>. Enforces Dev_Protocol.md §5 per-card commit discipline (the lesson captured in feedback_per_card_commits.md memory). The discipline is what lets §6 drop Files Modified — QA finds the diff via `git log --grep='#<card>'` instead of reading a re-narration. Fail-open on missing tools/env/repo.",
         "matcher": "mcp__trello__move_card",
         "hooks": [
           {
@@ -171,7 +180,7 @@
     ],
     "PreCompact": [
       {
-        "$comment": "Handoff gate on compaction. Matcher manual|auto \u2014 BOTH paths: the context-wall freeze ends in a manual /compact, which would otherwise be the one ungated door. Blocks unless handoffs/dev-handoff-YYYY-MM-DD.md exists for today AND was written within FRESHNESS_SECONDS (existence alone let a morning handoff satisfy an evening compaction). Fails open on missing $CLAUDE_PROJECT_DIR, missing handoffs dir, or an unstattable file.",
+        "$comment": "Handoff gate on compaction. Matcher manual|auto — BOTH paths: the context-wall freeze ends in a manual /compact, which would otherwise be the one ungated door. Blocks unless handoffs/dev-handoff-YYYY-MM-DD.md exists for today AND was written within FRESHNESS_SECONDS (existence alone let a morning handoff satisfy an evening compaction). Fails open on missing $CLAUDE_PROJECT_DIR, missing handoffs dir, or an unstattable file.",
         "matcher": "manual|auto",
         "hooks": [
           {

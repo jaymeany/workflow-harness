@@ -3,6 +3,15 @@
   "hooks": {
     "SessionStart": [
       {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-first-start-check.sh",
+            "$comment": "First start: while any {{placeholder}} remains, tells the session to send the user to the orchestrator and do no work. Silent once setup is done."
+          }
+        ]
+      },
+      {
         "$comment": "Preload Research_Role.md (role identity, disposition, hard constraints) via additionalContext. One file per loader; the briefing is split semantically across role / methodology / cards / coordination. The app CLAUDE.md is in a sibling tree off the walk-up path and is NOT auto-loaded; Read it explicitly when working on app code.",
         "hooks": [
           {
@@ -10,7 +19,7 @@
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-research-role.sh"
           },
           {
-            "$comment": "Emits Research_Build.md \u2014 what is being built and where cards come from. Split from Research_Role.md when it overflowed the context cap.",
+            "$comment": "Emits Research_Build.md — what is being built and where cards come from. Split from Research_Role.md when it overflowed the context cap.",
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-research-build.sh"
           }
@@ -35,7 +44,7 @@
         ]
       },
       {
-        "$comment": "Preload protocol/Research_Hooks.md (the hook-enforced inventory) via additionalContext. Split out of Research_Cards.md when that doc crossed the ~10K additionalContext cap \u2014 the seam is card-authoring rules vs enforcement machinery. Counted by load-status-digest.sh like any other doc loader.",
+        "$comment": "Preload protocol/Research_Hooks.md (the hook-enforced inventory) via additionalContext. Split out of Research_Cards.md when that doc crossed the ~10K additionalContext cap — the seam is card-authoring rules vs enforcement machinery. Counted by load-status-digest.sh like any other doc loader.",
         "hooks": [
           {
             "type": "command",
@@ -62,7 +71,7 @@
         ]
       },
       {
-        "$comment": "Surface the research role's Trello column queue (the Research column) at session start, plus a soft-start suggestion for `/loop /check-trello 300s`. This hook never queries Trello \u2014 it only emits the reminder string; the actual column query happens in `/check-trello`, resolved by name across the board ids in the walk-down project CLAUDE.md Trello section (never the global MCP active board). Fail-open: missing jq \u2192 silent.",
+        "$comment": "Surface the research role's Trello column queue (the Research column) at session start, plus a soft-start suggestion for `/loop /check-trello 300s`. This hook never queries Trello — it only emits the reminder string; the actual column query happens in `/check-trello`, resolved by name across the board ids in the walk-down project CLAUDE.md Trello section (never the global MCP active board). Fail-open: missing jq → silent.",
         "hooks": [
           {
             "type": "command",
@@ -71,7 +80,7 @@
         ]
       },
       {
-        "$comment": "Audit every sibling hook for static fail-open conditions at session start. Discovers hooks by globbing the same directory, parses each one's `# Requires:` and `# Environment:` header lines, and validates declared CLI tools and env vars against the current shell. If any hook would silently allow tool calls because its declared preconditions are unmet, emits a loud banner (stderr + additionalContext) listing every affected hook and what's missing. Stays silent when all hooks are healthy. Agnostic \u2014 depends only on the header convention, no hardcoded hook names \u2014 so it travels with the role template into any new project.",
+        "$comment": "Audit every sibling hook for static fail-open conditions at session start. Discovers hooks by globbing the same directory, parses each one's `# Requires:` and `# Environment:` header lines, and validates declared CLI tools and env vars against the current shell. If any hook would silently allow tool calls because its declared preconditions are unmet, emits a loud banner (stderr + additionalContext) listing every affected hook and what's missing. Stays silent when all hooks are healthy. Agnostic — depends only on the header convention, no hardcoded hook names — so it travels with the role template into any new project.",
         "hooks": [
           {
             "type": "command",
@@ -80,7 +89,7 @@
         ]
       },
       {
-        "$comment": "Status digest. Runs LAST under SessionStart. Re-runs each load-research-*.sh doc loader (excluding bus/trello catchups and itself) in a subshell, measures the real emitted additionalContext body, and prints an OK or WARN line. Makes overflow visible \u2014 without this, a doc that grows past the harness's ~10K additionalContext cap silently becomes a ~2KB pointer with no signal to the agent. Fix path on WARN: split the source file at a new semantic seam, never reintroduce byte-range slicing.",
+        "$comment": "Status digest. Runs LAST under SessionStart. Re-runs each load-research-*.sh doc loader (excluding bus/trello catchups and itself) in a subshell, measures the real emitted additionalContext body, and prints an OK or WARN line. Makes overflow visible — without this, a doc that grows past the harness's ~10K additionalContext cap silently becomes a ~2KB pointer with no signal to the agent. Fix path on WARN: split the source file at a new semantic seam, never reintroduce byte-range slicing.",
         "hooks": [
           {
             "type": "command",
@@ -101,7 +110,7 @@
         ]
       },
       {
-        "$comment": "Card structural gate. Fires on every card write: update_card_details, add_card_to_list, and move_card. Three structural checks derived from protocol/Research_Cards.md, sourced from protocol-enforcement.conf: (A) header allowlist \u2014 rejects invented sections like 'Handoff Notes for Dev', 'Dev Decisions', 'Implementation Order' that prescribe implementation; (B) file-count cap \u2014 rejects cards with >3 files in 'Files to Modify' + 'Files to Create' tables unless the card references a parent or lists children; (C) required-when-complete \u2014 when a description contains '## Research Complete', required sections (Services Discovered / Files to Modify / Confidence) must be present. Fires at write time (not move time) because move_card isn't always Claude's action \u2014 user may move cards via Trello UI, so structure must be validated when the description is being written. add_card_to_list is matched so newly-created cards are also validated against the structural rules, not just existing-card updates.",
+        "$comment": "Card structural gate. Fires on every card write: update_card_details, add_card_to_list, and move_card. Three structural checks derived from protocol/Research_Cards.md, sourced from protocol-enforcement.conf: (A) header allowlist — rejects invented sections like 'Handoff Notes for Dev', 'Dev Decisions', 'Implementation Order' that prescribe implementation; (B) file-count cap — rejects cards with >3 files in 'Files to Modify' + 'Files to Create' tables unless the card references a parent or lists children; (C) required-when-complete — when a description contains '## Research Complete', required sections (Services Discovered / Files to Modify / Confidence) must be present. Fires at write time (not move time) because move_card isn't always Claude's action — user may move cards via Trello UI, so structure must be validated when the description is being written. add_card_to_list is matched so newly-created cards are also validated against the structural rules, not just existing-card updates.",
         "matcher": "mcp__trello__(update_card_details|add_card_to_list|move_card)",
         "hooks": [
           {
@@ -111,7 +120,7 @@
         ]
       },
       {
-        "$comment": "Column-scope gate. Enforces Research_Role.md \u00a7 Card Management \u00a7 Hard Constraints #1: Research writes only to cards currently in the Research column. Fires on mcp__trello__update_card_details \u2014 fetches the card's current idList, looks up the list name, denies if it isn't the Research column. Match via is_research_column (lib.sh): the word 'research' anywhere in the name, case-insensitive, on word boundaries \u2014 so 'Research' and 'Research and prep' both pass and a board relabel can't take the role offline. Works across the main board and feature-worktree boards that share column naming. Fails open on missing tools/env/api so transient Trello issues don't block legitimate work.",
+        "$comment": "Column-scope gate. Enforces Research_Role.md § Card Management § Hard Constraints #1: Research writes only to cards currently in the Research column. Fires on mcp__trello__update_card_details — fetches the card's current idList, looks up the list name, denies if it isn't the Research column. Match via is_research_column (lib.sh): the word 'research' anywhere in the name, case-insensitive, on word boundaries — so 'Research' and 'Research and prep' both pass and a board relabel can't take the role offline. Works across the main board and feature-worktree boards that share column naming. Fails open on missing tools/env/api so transient Trello issues don't block legitimate work.",
         "matcher": "mcp__trello__update_card_details",
         "hooks": [
           {
@@ -121,7 +130,7 @@
         ]
       },
       {
-        "$comment": "Comment-tool deny. Backstops Research_Role.md \u00a7 Card Management \u00a7 Hard Constraints: Research findings go in the card description, not in comments. The other Hard Constraints have hook-level enforcement (column scope, structural integrity, research-completeness); this one previously sat on prose alone. Fires on add_comment, update_comment, delete_comment.",
+        "$comment": "Comment-tool deny. Backstops Research_Role.md § Card Management § Hard Constraints: Research findings go in the card description, not in comments. The other Hard Constraints have hook-level enforcement (column scope, structural integrity, research-completeness); this one previously sat on prose alone. Fires on add_comment, update_comment, delete_comment.",
         "matcher": "mcp__trello__(add_comment|update_comment|delete_comment)",
         "hooks": [
           {
@@ -131,7 +140,7 @@
         ]
       },
       {
-        "$comment": "Description append-only gate. Backstops Research_Role.md \u00a7 Card Management \u00a7 Hard Constraints #3: description writes must preserve existing content. Fires on mcp__trello__update_card_details when tool_input.description is set. Fetches the current description and denies the write unless the new description contains the current description as a substring (i.e., it's a strict append). Wholesale replacement that would wipe history is blocked. The card description is the work record other roles read against; this hook protects it.",
+        "$comment": "Description append-only gate. Backstops Research_Role.md § Card Management § Hard Constraints #3: description writes must preserve existing content. Fires on mcp__trello__update_card_details when tool_input.description is set. Fetches the current description and denies the write unless the new description contains the current description as a substring (i.e., it's a strict append). Wholesale replacement that would wipe history is blocked. The card description is the work record other roles read against; this hook protects it.",
         "matcher": "mcp__trello__update_card_details",
         "hooks": [
           {
@@ -141,7 +150,7 @@
         ]
       },
       {
-        "$comment": "Card-title gate. Enforces Research_Role.md \u00a7 Card Management \u00a7 Naming convention: '#<idShort> <title> <24-char Trello id>', three parts for every role, with an optional trailing worktree tag. Trello assigns idShort + id at create time, so on add_card_to_list the canonical name cannot be assembled. Hook requires a '[TBD] <title>' placeholder on creates, signaling the canonical rename is coming. On update_card_details with a name change, fetches the card's idShort + id from Trello and blocks the write unless the new name matches the canonical pattern using the actual IDs. Failure mode this guards against: agent creates a card with a descriptive-only name, marks the task complete, ships the misnamed card. Cards on the board ended up in two shapes (canonical vs. ad-hoc); this hook makes 'untitled' a write-time error. The optional tag is checked against board_tag in protocol-enforcement.conf.",
+        "$comment": "Card-title gate. Enforces Research_Role.md § Card Management § Naming convention: '#<idShort> <title> <24-char Trello id>', three parts for every role, with an optional trailing worktree tag. Trello assigns idShort + id at create time, so on add_card_to_list the canonical name cannot be assembled. Hook requires a '[TBD] <title>' placeholder on creates, signaling the canonical rename is coming. On update_card_details with a name change, fetches the card's idShort + id from Trello and blocks the write unless the new name matches the canonical pattern using the actual IDs. Failure mode this guards against: agent creates a card with a descriptive-only name, marks the task complete, ships the misnamed card. Cards on the board ended up in two shapes (canonical vs. ad-hoc); this hook makes 'untitled' a write-time error. The optional tag is checked against board_tag in protocol-enforcement.conf.",
         "matcher": "mcp__trello__(add_card_to_list|update_card_details)",
         "hooks": [
           {
@@ -151,7 +160,7 @@
         ]
       },
       {
-        "$comment": "Research-Complete gate + labeler + auto-advance. Fires LAST among PreToolUse hooks for update_card_details (and on move_card). Three behaviors: (1) on move_card to Now, validates description qualification \u2014 denies if missing marker, blocker tags, or unresolved Open Questions; attaches green label on pass. (2) on update_card_details where the post-update or current description qualifies, attaches green label AND advances the card from the Research column to 'Now' so Dev picks it up without an explicit move_card. (3) on update_card_details where tool_input.labels includes the Research Complete label id and the description doesn't qualify, denies the labels-bypass attempt. Why LAST: this hook moves the card via curl PUT during PreToolUse. If it fired before gate-column-scope, the card would be in Now by the time column-scope fetches its location, blocking the underlying update_card_details. By running last, all column-scope-dependent gates see the card still in the Research column (passes), then this hook performs the advance, then the actual tool call applies the description update to the now-in-Now card.",
+        "$comment": "Research-Complete gate + labeler + auto-advance. Fires LAST among PreToolUse hooks for update_card_details (and on move_card). Three behaviors: (1) on move_card to Now, validates description qualification — denies if missing marker, blocker tags, or unresolved Open Questions; attaches green label on pass. (2) on update_card_details where the post-update or current description qualifies, attaches green label AND advances the card from the Research column to 'Now' so Dev picks it up without an explicit move_card. (3) on update_card_details where tool_input.labels includes the Research Complete label id and the description doesn't qualify, denies the labels-bypass attempt. Why LAST: this hook moves the card via curl PUT during PreToolUse. If it fired before gate-column-scope, the card would be in Now by the time column-scope fetches its location, blocking the underlying update_card_details. By running last, all column-scope-dependent gates see the card still in the Research column (passes), then this hook performs the advance, then the actual tool call applies the description update to the now-in-Now card.",
         "matcher": "mcp__trello__(move_card|update_card_details)",
         "hooks": [
           {
@@ -163,7 +172,7 @@
     ],
     "PostToolUse": [
       {
-        "$comment": "Research-complete label attach on card creation. Fires after mcp__trello__add_card_to_list succeeds. Evaluates the submitted description against the research-complete criteria (## Research Complete marker, no blocker tags, no unresolved open questions) and attaches the board's green 'Research complete' label if the card qualifies. Closes a gap in gate-research-complete.sh, which handles label-on-save for update_card_details + move_card but cannot attach to cards that don't exist yet (PreToolUse runs before create). Non-blocking \u2014 best-effort label attach only.",
+        "$comment": "Research-complete label attach on card creation. Fires after mcp__trello__add_card_to_list succeeds. Evaluates the submitted description against the research-complete criteria (## Research Complete marker, no blocker tags, no unresolved open questions) and attaches the board's green 'Research complete' label if the card qualifies. Closes a gap in gate-research-complete.sh, which handles label-on-save for update_card_details + move_card but cannot attach to cards that don't exist yet (PreToolUse runs before create). Non-blocking — best-effort label attach only.",
         "matcher": "mcp__trello__add_card_to_list",
         "hooks": [
           {
@@ -175,7 +184,7 @@
     ],
     "PreCompact": [
       {
-        "$comment": "Pre-compact handoff gate. On automatic compaction (not manual /compact), blocks if today's research-handoff-YYYY-MM-DD.md doesn't exist in the handoffs dir. Surfaces a structured stderr prompt with the required handoff sections inlined so the agent writes the durable cross-session artifact BEFORE compaction summarizes session detail away. Sweep-safe: hook writes nothing and references no other handoff file. Fails open if $CLAUDE_PROJECT_DIR unresolvable or handoffs dir missing \u2014 never wedges auto-compact on an environment glitch.",
+        "$comment": "Pre-compact handoff gate. On automatic compaction (not manual /compact), blocks if today's research-handoff-YYYY-MM-DD.md doesn't exist in the handoffs dir. Surfaces a structured stderr prompt with the required handoff sections inlined so the agent writes the durable cross-session artifact BEFORE compaction summarizes session detail away. Sweep-safe: hook writes nothing and references no other handoff file. Fails open if $CLAUDE_PROJECT_DIR unresolvable or handoffs dir missing — never wedges auto-compact on an environment glitch.",
         "matcher": "manual|auto",
         "hooks": [
           {

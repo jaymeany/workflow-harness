@@ -6,6 +6,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-first-start-check.sh",
+            "$comment": "First start: while any {{placeholder}} remains, tells the session to send the user to the orchestrator and do no work. Silent once setup is done."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-designer-role.sh",
             "$comment": "Loads load-designer-role.sh at session start."
           },
