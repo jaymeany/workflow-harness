@@ -45,7 +45,12 @@ The orchestrator walks you through setting up each of these.
 
    On a Mac, type `cd` and a space, drag that folder from Finder into the terminal window, and press Return.
 3. Type `claude` and press Return.
-4. Tell the orchestrator you are setting up.
+4. Tell the orchestrator you are setting up. Something like:
+
+   `I am setting up. Run first start with me.`
+
+   Anything works. It checks for itself whether setup has been done, and says so before it does
+   anything else.
 
 The orchestrator runs its first-start script with you. It learns what you want to build and what is on your
 computer. It helps you set up Git, GitHub and Trello, then the folders, then any optional tools, then the

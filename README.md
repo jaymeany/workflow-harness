@@ -267,7 +267,19 @@ Your copy is yours. Changes you make to it don't touch this repo.
 
 ## Start
 
-Open [`start-here/README.md`](start-here/README.md).
+Open [`start-here/README.md`](start-here/README.md). The short version:
+
+```bash
+cd Primary-project-name/app-or-project-name/docs/agent-workflows/orchestrator
+claude
+```
+
+Then say:
+
+> I am setting up. Run first start with me.
+
+Anything works, though. The orchestrator checks for itself whether setup has been done, and says so
+before it does anything else.
 
 ## About
 
