@@ -35,13 +35,13 @@
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-fail-open.sh",
-            "$comment": "Loads audit-fail-open.sh at session start."
+            "command": "\"$CLAUDE_PROJECT_DIR\"/../shared/audit-fail-open.sh",
+            "$comment": "Names any hook whose declared preconditions are unmet, in this role's .claude/hooks/ and in ../shared/, since such a hook allows the calls it was installed to gate. Silent when everything is present. ONE shared script serves every role."
           },
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-status-digest.sh",
-            "$comment": "Loads load-status-digest.sh at session start."
+            "command": "\"$CLAUDE_PROJECT_DIR\"/../shared/load-status-digest.sh",
+            "$comment": "Reports whether each protocol doc was inlined in full or overflowed the ~10K additionalContext cap and was silently replaced by a ~2KB preview. Measures only loaders that declare the .md they read, so functions in the same namespace are not counted as protocols. Must run LAST in SessionStart so its output lands at the bottom. ONE shared script serves every role."
           }
         ]
       }

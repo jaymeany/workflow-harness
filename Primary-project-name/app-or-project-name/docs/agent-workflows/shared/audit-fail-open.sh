@@ -31,17 +31,18 @@
 
 set -uo pipefail
 
-HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Two places hold this role's hooks: its own .claude/hooks/, and shared/ next
+# to this file, which holds the ones every role runs from one copy. Both are
+# this role's hooks; settings.json points at both and they run with this
+# role's CLAUDE_PROJECT_DIR. Auditing only one would silently drop the other
+# from the fail-open check.
+ROLE_HOOKS_DIR="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks"
+SHARED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SELF_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 problems=()
 
-# Shared hooks live outside this directory (../../../shared/), the way
-# board/board.sh does. They are still this role's hooks: settings.json points
-# at them and they run with this role's CLAUDE_PROJECT_DIR. Auditing only the
-# local directory would silently drop them from the fail-open check the moment
-# a hook was moved there.
-for hook_path in "$HOOKS_DIR"/*.sh "$HOOKS_DIR"/../../../shared/*.sh; do
+for hook_path in "$ROLE_HOOKS_DIR"/*.sh "$SHARED_DIR"/*.sh; do
   [[ -f "$hook_path" ]] || continue
   hook_name="$(basename "$hook_path")"
   [[ "$hook_name" == "$SELF_NAME" ]] && continue

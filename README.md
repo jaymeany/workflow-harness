@@ -177,8 +177,11 @@ QA reviews and decides:
 - FAIL sends it back to Now with the required fixes.
 - BOUNCE sends it to Research when the spec is the problem, or to Design when the design is.
 
-Each role with a column arms a watcher when its session starts. The watcher polls that column every 20
-seconds, read-only, and wakes the agent only when a card arrives.
+Each role with a column can arm a watcher: it polls that column every 20 seconds, read-only, and wakes the
+agent only when a card arrives. It's a doorbell, and whether you want one is your call. Set `BOARD_WATCHER`
+in `shared/preferences.conf` to `auto` for every role to arm on its first turn, `ask` to be offered it each
+session, or `off`. Off is the default, and `/check-trello` reads the column on demand either way. The
+orchestrator has no column and never arms one.
 
 Trello holds the work. Each card is a persistent unit of work context. The research, design notes,
 implementation notes and review stay on the card across sessions and agents. Moves, findings, reviews and

@@ -15,8 +15,8 @@ SendMessage({to: "<name>", message: "..."}) # send to a named peer
 If a peer is not listed, it is not running. The work still routes through the board and they will pick it
 up when they boot.
 
-**Arm exactly one Monitor per session: the board column watcher.** Do not arm a Monitor on any inbox
-path; there is no inbox.
+**At most one Monitor per session: the board column watcher**, and only when `BOARD_WATCHER` in
+`../../shared/preferences.conf` asks for it. Do not arm a Monitor on any inbox path; there is no inbox.
 
 ## What goes on the board, not into a message
 

@@ -36,7 +36,7 @@ The pieces:
 - `./protocol/Research_Hooks.md` — the hook-enforced inventory (what fires, on what, and each hook's built-in escape). Loaded by `load-research-hooks.sh`. Split out of `Research_Cards.md` when that doc crossed the context cap.
 - `./protocol/Research_Coordination.md` — talking to Dev and QA via ListAgents/SendMessage, and what belongs on the board instead. Loaded by `load-research-coordination.sh`.
 
-One SessionStart hook loads *state* rather than docs: `load-research-trello-catchup.sh` (column reminder plus the watcher arm block). It is excluded from the digest below — its output varies with board state, so a size WARN on it would be meaningless. `load-agent-comms.sh` emits static text about reaching peers.
+One SessionStart hook loads *state* rather than docs: `../shared/arm-column-watcher.sh` (the column rule, plus the watcher arm block when `BOARD_WATCHER` asks for it). The digest below measures only loaders that declare the `.md` they read, so a function like this one is never counted as a protocol doc. `load-agent-comms.sh` emits static text about reaching peers.
 
 The protocol is split across four files along semantic seams (methodology / card mechanics / hook inventory / coordination), one loader per file. Claude Code's `additionalContext` payload caps around ~10K chars per hook; over-cap content gets persisted to disk and substituted with a small preview, so each file stays under the cap by construction. `load-status-digest.sh` runs last in `SessionStart` and prints an OK/WARN line confirming every loader inlined in full — if a file ever crosses the cap the digest surfaces it; the fix is a further semantic split, never byte-range slicing inside a loader.
 
@@ -46,7 +46,8 @@ If you need to re-read any of the above mid-session, use `Read` directly.
 >
 >**There is no messaging bus.** Peers are reached with `ListAgents` and `SendMessage`. See `load-agent-comms.sh`.
 >
->**Arm exactly one Monitor per session:** the board column watcher.
+>**At most one Monitor per session:** the board column watcher, and only when `BOARD_WATCHER` in
+>`../shared/preferences.conf` asks for it. Nothing else.
 
 ## Handoffs
 

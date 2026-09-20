@@ -11,7 +11,7 @@
 
 set -euo pipefail
 command -v jq >/dev/null 2>&1 || exit 0
-DOC="${CLAUDE_PROJECT_DIR}/Research_Build.md"
-[[ -f "$DOC" ]] || exit 0
-jq -n --arg ctx "$(cat "$DOC")" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$ctx}}'
+FILE="${CLAUDE_PROJECT_DIR}/Research_Build.md"
+[[ -f "$FILE" ]] || exit 0
+jq -n --arg ctx "$(cat "$FILE")" '{hookSpecificOutput:{hookEventName:"SessionStart",additionalContext:$ctx}}'
 exit 0

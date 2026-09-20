@@ -46,7 +46,8 @@ If you need to re-read any of the above mid-session, use `Read` directly.
 >
 >**There is no messaging bus.** Peers are reached with `ListAgents` and `SendMessage`. See `load-agent-comms.sh`.
 >
->**Arm exactly one Monitor per session:** the board column watcher.
+>**At most one Monitor per session:** the board column watcher, and only when `BOARD_WATCHER` in
+>`../shared/preferences.conf` asks for it. Nothing else.
 >
 >**Severity axis.** Whether the claim is true and whether it should be public, not whether it would survive load. The walk-up project `CLAUDE.md` carries the boundaries; read them rather than assuming. See `QA_Role.md` §Disposition.
 

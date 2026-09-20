@@ -197,7 +197,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-qa-trello-catchup.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/../shared/arm-column-watcher.sh",
+            "$comment": "Column rule, and the column watcher when it is wanted. Always loads which column belongs to this role and which board, so the session is oriented. The watcher itself is BOARD_WATCHER in ../shared/preferences.conf: auto arms it on the first turn, ask has the role offer it and wait, off skips it entirely (the default) and /check-trello reads the column on demand. Makes no board call; it emits text. ONE shared script serves every role with a column, like board/board.sh. Was load-<role>-trello-catchup.sh, which caught up on nothing, was not Trello specific, and sat in the namespace the status digest globs for protocol docs."
           }
         ]
       },
@@ -206,7 +207,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/audit-fail-open.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/../shared/audit-fail-open.sh",
+            "$comment": "Names any hook whose declared preconditions are unmet, in this role's .claude/hooks/ and in ../shared/, since such a hook allows the calls it was installed to gate. Silent when everything is present. ONE shared script serves every role."
           }
         ]
       },
@@ -215,7 +217,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/load-status-digest.sh"
+            "command": "\"$CLAUDE_PROJECT_DIR\"/../shared/load-status-digest.sh",
+            "$comment": "Reports whether each protocol doc was inlined in full or overflowed the ~10K additionalContext cap and was silently replaced by a ~2KB preview. Measures only loaders that declare the .md they read, so functions in the same namespace are not counted as protocols. Must run LAST in SessionStart so its output lands at the bottom. ONE shared script serves every role."
           }
         ]
       }

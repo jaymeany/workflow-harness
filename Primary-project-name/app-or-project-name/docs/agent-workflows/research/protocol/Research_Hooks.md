@@ -34,9 +34,9 @@ Structural rules for research cards are enforced by hooks in `.claude/hooks/`, c
 Two further SessionStart hooks load *state*, not docs, and are excluded from the digest (their size varies with inbox/board contents):
 
 - `load-agent-comms.sh` — states that peers are reached with `ListAgents` and `SendMessage`, that there is no bus, and that the board column watcher is the only Monitor to arm.
-- `load-research-trello-catchup.sh` — emits the column-matching rule and instructs the session to arm the **board column watcher** Monitor. The hook makes no board call; the watcher finds the Research list id on its first poll.
+- `../shared/arm-column-watcher.sh` — emits the column-matching rule always, and the **board column watcher** arm block when `BOARD_WATCHER` in `../shared/preferences.conf` is `auto` or `ask`. The hook makes no board call; the watcher finds the Research list id on its first poll.
 
-Arm the board column watcher Monitor as your first action each session. It is the wake signal for new cards; do not replace it with a `/loop` polling command.
+When the watcher is armed it is the wake signal for new cards, so arm it as your first action and never replace it with a `/loop` polling command. Whether it is armed at all is the user's setting: `BOARD_WATCHER` is `auto`, `ask` or `off`. With it off, `/check-trello` reads the column on demand and no Monitor is armed.
 
 One loader per file, split semantically (identity / methodology / cards / coordination). Claude Code's `additionalContext` caps around ~10K chars per hook; over-cap content is persisted to disk and substituted with a small preview, so keeping each file under the cap means each loader inlines its doc in full. `load-status-digest.sh` runs last in `SessionStart` and reports OK or WARN; a WARN means a file crossed the cap and the fix is a further semantic split, never byte-range slicing inside a loader.
 

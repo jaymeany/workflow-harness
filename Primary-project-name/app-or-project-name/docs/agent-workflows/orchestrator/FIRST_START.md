@@ -207,10 +207,25 @@ remove those references or leave them, and do what they choose. The references a
 
    Work starts in Research or Design.
 5. Explain how to start an agent: open a new terminal window, `cd` into its folder under
-   `docs/agent-workflows/`, and type `claude`. Give the full path for each. Each agent with a column arms a
-   watcher when it starts. It tells the user which board it is watching, and wakes the agent when a card
-   arrives.
-6. Explain the `CLAUDE.md` files in the walk-up: each agent loads the workspace file, the project file, the
+   `docs/agent-workflows/`, and type `claude`. Give the full path for each.
+
+6. **Ask about the column watcher.** Each agent with a column can watch it and wake when a card arrives,
+   instead of waiting to be asked. Put it to the user plainly and record their answer in
+   `docs/agent-workflows/shared/preferences.conf` as `BOARD_WATCHER`:
+
+   - **`auto`**: every role with a column arms its watcher on its first turn. Work moves between roles on
+     its own. Best when several roles run at once and you are not watching them.
+   - **`ask`**: each role offers the watcher at session start and waits. Best when you want it on some
+     sessions and not others.
+   - **`off`**: no watcher anywhere. You read the column with `/check-trello` when you want to. Best when
+     you drive one role at a time. **This is the default**, so doing nothing is a real answer.
+
+   Say what it costs: a watcher is about 3000 characters of context per role at session start plus one
+   background poll each, and it is a read-only poll every 20 seconds. Say what off costs: a card handed to
+   a role does not wake it, so someone has to look.
+
+   This is changeable any time. Nothing is locked in.
+7. Explain the `CLAUDE.md` files in the walk-up: each agent loads the workspace file, the project file, the
    docs file and its own, from its folder up.
 
 ## 7. Fill the placeholders
@@ -221,6 +236,8 @@ Search for `{{` in these places and fill every value:
 - `app-or-project-name/CLAUDE.md`
 - `app-or-project-name/docs/CLAUDE.md`
 - every `CLAUDE.md`, `.md` doc and `.claude/hooks/` file under `docs/agent-workflows/`
+- `docs/agent-workflows/shared/`. The hooks every role runs from one copy. Not inside any
+  `.claude/hooks/` folder, so a search that only looks there will miss it.
 - `docs/agent-workflows/board/board.conf`. The hooks read the board id from
   here. Leave it unfilled and every board gate quietly allows everything.
 

@@ -9,15 +9,23 @@
 #
 # Provenance:
 #   - The ~10,000-char additionalContext cap is a Claude Code harness
-#     constraint. Real, native.
+#     constraint (https://code.claude.com/docs/en/hooks). Real, native.
 #   - This digest hook is agent-authored. Its job is to make the cap's
 #     consequence visible at session start so an overflow can never
 #     hide behind a normal-looking system reminder again.
 #
-# Discovery: globs `load-research-*.sh` in the hooks dir, excludes state
-# loaders (bus-catchup, trello-catchup) and the digest itself. Re-runs
-# each remaining loader in a subshell and measures the real emitted
-# payload — no duplication of any loader's path or slicing logic.
+# ONE copy, shared by every role, the way board/board.sh is. The role comes
+# from $CLAUDE_PROJECT_DIR, so this file needs nothing from its own location.
+#
+# It used to be five copies in two different generations: three globbed a
+# hardcoded `load-dev-*.sh` / `load-research-*.sh` / `load-qa-*.sh`, and two
+# derived the role correctly but carried dev's skip list. The comment below
+# about a hardcoded prefix finding zero loaders was present only in the copies
+# that had already fixed it.
+#
+# Discovery: globs `load-<role>-*.sh` in the role's hooks dir, keeps the ones
+# that declare the .md they read, and re-runs each in a subshell to measure the
+# real emitted payload. No duplication of any loader's path or slicing logic.
 #
 # Must run AFTER all other SessionStart hooks in settings.json so its
 # output appears at the bottom of the session-start context.
@@ -41,14 +49,24 @@ overflow_count=0
 ok_count=0
 max_chars=0
 
-for loader_path in "$HOOKS_DIR"/load-research-*.sh; do
+# Role is derived from the session cwd, never hardcoded. This file is
+# copied between roles, and a hardcoded prefix silently finds zero
+# loaders in the new role while still reporting success.
+ROLE="$(basename "${CLAUDE_PROJECT_DIR}")"
+for loader_path in "$HOOKS_DIR"/load-"$ROLE"-*.sh; do
   [[ -f "$loader_path" ]] || continue
   loader=$(basename "$loader_path" .sh)
 
-  # Skip non-doc loaders (state catchups) and the digest itself.
-  case "$loader" in
-    load-research-bus-catchup|load-research-trello-catchup|load-status-digest) continue ;;
-  esac
+  # Measure protocol docs and nothing else.
+  #
+  # A doc loader is a dumb file loader: it declares the .md it reads and emits
+  # it whole. That declaration is the test. Anything else in this namespace is
+  # a function, not a protocol, and a size report on it is meaningless.
+  #
+  # This used to be a denylist of filenames, which drifted the moment the file
+  # was copied to another role: two roles carried dev's list and measured their
+  # own watcher hook as though it were a protocol doc.
+  grep -qE '^FILE="[^"]+\.md"' "$loader_path" || continue
 
   # Re-run the loader; capture its real emitted JSON. `|| true` so a
   # loader failure can't abort the digest under `set -e`.

@@ -22,7 +22,7 @@
 #
 # HOW HARD IT PUSHES IS A PREFERENCE
 #
-# shared/handoffs.conf sets HANDOFF_GATE to block, warn or off. Blocking
+# shared/preferences.conf sets HANDOFF_GATE to block, warn or off. Blocking
 # compaction until someone writes a handoff is a strong opinion about how to
 # work, and not everyone shares it. Default is block; the refusal message says
 # how to change it.
@@ -95,7 +95,7 @@ HANDOFF_FILE="${HANDOFFS_DIR}/${ROLE}-handoff-${TODAY}.md"
 # ---------------------------------------------------------------------------
 HANDOFF_GATE="block"
 HANDOFF_FRESHNESS_SECONDS=3600
-_conf="$(dirname "${BASH_SOURCE[0]}")/handoffs.conf"
+_conf="$(dirname "${BASH_SOURCE[0]}")/preferences.conf"
 if [ -f "$_conf" ]; then
   # shellcheck disable=SC1090
   . "$_conf"
@@ -155,9 +155,9 @@ fi
 # ---------------------------------------------------------------------------
 if [ "$HANDOFF_GATE" = "warn" ]; then
   if [ "$state" = "stale" ]; then
-    say_and_allow "Compaction is proceeding and today's ${ROLE} handoff is ${age_min} minutes old. Everything since then is about to be summarised away. Refresh ${ABS_HANDOFF_FILE} when you can. (HANDOFF_GATE=warn in agent-workflows/shared/handoffs.conf.)"
+    say_and_allow "Compaction is proceeding and today's ${ROLE} handoff is ${age_min} minutes old. Everything since then is about to be summarised away. Refresh ${ABS_HANDOFF_FILE} when you can. (HANDOFF_GATE=warn in agent-workflows/shared/preferences.conf.)"
   fi
-  say_and_allow "Compaction is proceeding and today's ${ROLE} handoff has not been written. This session's detail is about to be summarised away. Write ${ABS_HANDOFF_FILE} when you can. (HANDOFF_GATE=warn in agent-workflows/shared/handoffs.conf.)"
+  say_and_allow "Compaction is proceeding and today's ${ROLE} handoff has not been written. This session's detail is about to be summarised away. Write ${ABS_HANDOFF_FILE} when you can. (HANDOFF_GATE=warn in agent-workflows/shared/preferences.conf.)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -210,7 +210,7 @@ Then continue working. The next compaction in this session will not be refused a
 HUMAN ESCAPE HATCH: if the session is already at the context wall and cannot take a turn, run:
   touch "$ABS_HANDOFF_FILE" && /compact
 
-PREFERENCE: this gate is HANDOFF_GATE in agent-workflows/shared/handoffs.conf. Set it to "warn" to be told without being stopped, or "off" to switch it off.
+PREFERENCE: this gate is HANDOFF_GATE in agent-workflows/shared/preferences.conf. Set it to "warn" to be told without being stopped, or "off" to switch it off.
 EOF
   exit 2
 fi
@@ -260,7 +260,7 @@ The next compaction in this session will not be refused again, whether or not yo
 HUMAN ESCAPE HATCH: if the session is already at the context wall and cannot take a turn, run:
   touch "$ABS_HANDOFF_FILE" && /compact
 
-PREFERENCE: this gate is HANDOFF_GATE in agent-workflows/shared/handoffs.conf. Set it to "warn" to be told without being stopped, or "off" to switch it off.
+PREFERENCE: this gate is HANDOFF_GATE in agent-workflows/shared/preferences.conf. Set it to "warn" to be told without being stopped, or "off" to switch it off.
 EOF
 
 exit 2
