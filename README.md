@@ -159,23 +159,32 @@ decision matrix, the review template, iteration, hotfixes, and what not to flag.
 ## How work moves
 
 ```
-Next --> Research ----------> Now --> QA --> Done
-  |        ^  |                ^       |
-  |        |  v                +-------+  FAIL
-  +-----> Design
+Next ─┬─▶ Design ─▶ Research ─▶ Now ─▶ QA ─▶ Done
+      └──────────────▲
 ```
 
-A card starts in Next, written so the role that receives it can start without asking a question. It moves
-between Research and Design until the evidence and the surface are ready. Research hands it to Dev by
-attaching the green Research complete label, and a hook checks the card before moving it to Now. Dev
-commits the work under the card number, posts implementation notes and moves the card to QA. A hook then
-hands Dev the next card in Now.
+A card starts in Next, written so the role that receives it can start without asking a question. It goes to
+Design when the surface doesn't exist yet, or straight to Research when it does. Design hands it on to
+Research, which writes the card Dev builds from.
 
-QA reviews and decides:
+**Research is what moves a card to Now.** It attaches the green Research complete label, and a hook checks
+the card before the move. Dev commits the work under the card number, posts implementation notes and moves
+the card to QA. A hook then hands Dev the next card in Now.
 
-- PASS moves the card to Done.
-- FAIL sends it back to Now with the required fixes.
-- BOUNCE sends it to Research when the spec is the problem, or to Design when the design is.
+Work also goes backwards, and that's the flow working rather than failing:
+
+| Move | Who | When |
+|---|---|---|
+| Now → Research | Dev | The research is wrong, or the card defers a decision Dev shouldn't make |
+| Now → Design | Dev | The surface is the problem |
+| QA → Done | QA | PASS |
+| QA → Now | QA | FAIL, with the required fixes |
+| QA → Research | QA | BOUNCE, the spec can't be met as written |
+| QA → Design | QA | BOUNCE, the gap is in the design |
+| new card → Research | QA | Every finding becomes a tracking card before a card can pass |
+
+QA is the only role that moves a card out of QA, and the only one that moves a card to Done. The other way
+into Now is a QA FAIL.
 
 Each role with a column can arm a watcher: it polls that column every 20 seconds, read-only, and wakes the
 agent only when a card arrives. It's a doorbell, and whether you want one is your call. Set `BOARD_WATCHER`
