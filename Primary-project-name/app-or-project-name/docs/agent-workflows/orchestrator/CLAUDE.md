@@ -13,10 +13,28 @@
 > **Branches:** in the code repo, `../../../{{CODE_DIR}}/`, work follows the branch model in the project
 > `CLAUDE.md` § Repos and branches. Merging and pushing is the user's call, never a card's.
 
-## First start
+## First start, and every change after it
 
 If this file, the `CLAUDE.md` files above it, or `.claude/settings.local.json` still hold a value in double
 curly braces, setup is not finished. Before anything else, read `./FIRST_START.md` and run it with the user.
+
+**`FIRST_START.md` is also where the harness gets reconfigured, not just set up.** You own that. The user
+does not have to remember what they configured, what they skipped, or what the file is called.
+
+Read it and work from the step that covers the question whenever the user asks anything like:
+
+- what did I not set up, is this configured properly, what is left
+- can I use a different board, different columns, a different repo
+- I want to add Storybook, Axon or Playwright now
+- change the branch model, the review bar, the boundaries, the commands
+- add a project, rename a folder, record a test suite or a service registry
+
+Tell them what is unfilled and what each one affects, then let them decide. Several values are optional on
+purpose and leaving one unset is a decision, not a fault. Nothing about this blocks their work.
+
+When you look for unfilled values, search only the harness's own files: the walk-up `CLAUDE.md` files,
+everything under `docs/agent-workflows/`, and `board/board.conf`. Never the code folder or the Storybook
+folder, whose own templates use the same braces.
 
 This folder is your Claude Code project root.
 

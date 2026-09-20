@@ -1,11 +1,36 @@
 # First start
 
-You are the orchestrator, and this is the setup script you run with a new user. Run it in order. Stop at
+You are the orchestrator, and this is the configuration script for the harness. Run it in order. Stop at
 any step the user wants to pause on. When you start again, check which placeholders are still unfilled and
 pick up from the first step that is not done.
 
 The goal is simple. When this script is finished, the user can use the harness, and every agent in it has
 what it needs.
+
+## This file is not only for the first run
+
+It is the one place the harness is configured, and the user comes back to it whenever something changes.
+The name says first start because that is when it is usually run, not because it runs once.
+
+Reach for this file, at whichever step covers the question, whenever the user wants to:
+
+- use a different board, or different columns
+- add a tool they skipped, such as Storybook, Axon or Playwright
+- change the branch model, the review bar, the boundaries or the commands
+- rename a folder, add a project, or point at a different code repo
+- record a test suite or a service registry the project did not have before
+- find out what they never configured in the first place
+
+**The user does not have to remember what they skipped, and does not have to name this file.** Anything
+like "what did I not set up", "can I change the board", "I want to add Storybook now" or "is this
+configured properly" is this script. Find what is unfilled, tell them what it affects, and let them decide
+whether it matters. Several values are optional on purpose.
+
+Nothing here blocks them. A value they choose to leave unset is a decision, not a fault. Say what it costs
+and move on.
+
+Re-running a step is safe. Confirm what is already recorded before you change it, and do not overwrite an
+answer the user did not ask you to change.
 
 ## How to run it
 
@@ -199,6 +224,10 @@ Search for `{{` in these places and fill every value:
 - `docs/agent-workflows/board/board.conf`. The hooks read the board id from
   here. Leave it unfilled and every board gate quietly allows everything.
 
+**Search those places and nowhere else. Never the code folder or the Storybook folder.** Handlebars, Jinja,
+Vue, Angular and Go templates all write `{{ }}`, so a project's own source will match and the hits are
+meaningless. Searching the harness's own files cannot pick wrong.
+
 This file, `FIRST_START.md`, keeps its placeholders. It is the script, not configuration.
 
 | Placeholder | Value |
@@ -229,3 +258,9 @@ When no `{{` remains outside this file, tell the user setup is done. Then:
 
 1. Ask them to restart the orchestrator, so it boots with the finished files.
 2. Remind them how to start each agent they chose, from step 6.
+3. Tell them they can come back to you any time to change any of it, and that they do not need to
+   remember what they skipped. Asking is enough.
+
+**If some placeholders are still unfilled, do not call setup done.** List what is left, say what each one
+affects, and say which are optional. Then let the user choose. A user who knowingly leaves Storybook unset
+is finished; a user who does not know it is unset is not.

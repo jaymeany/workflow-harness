@@ -61,6 +61,17 @@ other agents.
 
 You can stop at any time. When you start the orchestrator again, it picks up where you left off.
 
+## Changing things later
+
+The orchestrator is also how you change the setup after it is done. A different Trello board, a tool you
+skipped the first time, a different branch model, a renamed folder.
+
+Start it and say what you want in your own words. There is no command to remember and no file to find.
+
+You also don't have to remember what you skipped. Ask it what is not set up. It will tell you what is
+unset, what each one affects, and which ones are optional, and then you decide. Leaving something unset on
+purpose is fine. Several parts of the harness are optional.
+
 ## The folders
 
 `Primary-project-name/` is your workspace. `app-or-project-name/` is your first project. The workspace

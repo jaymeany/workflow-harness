@@ -32,6 +32,11 @@ The orchestrator takes it from there. It speaks first, so there is nothing to pa
 ahead of time. It walks you through git, Trello, your stack, the optional tools and the other agents, one
 step at a time. You can stop at any point and pick up where you left off.
 
+It is also where you go to change any of it later. A different board, a tool you skipped, a new branch
+model, a folder rename. Start the orchestrator and say what you want. You don't need to remember what you
+configured or what you left out. Ask it what is unset and it will tell you what each one affects, and
+which ones don't matter.
+
 See "What you need" below for the accounts and tools. The script checks the ones it can.
 
 The tools in this harness are my answers to problems any agent workflow runs into. They're my personal
