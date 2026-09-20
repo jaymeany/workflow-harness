@@ -47,6 +47,67 @@ answer the user did not ask you to change.
 - **Preferences are the user's.** Where this script offers a default, it is a suggestion. Record what the
   user chooses.
 
+## Open the session before you run a step
+
+The user has just started an agent and does not know what is coming. Say what this is before you ask the
+first question. Cover five things in your own words:
+
+- It is a multi-step setup. Some of it every project needs. The rest depends on how the user works.
+- It will take a while. Give the range.
+- Nothing is locked in. Any of it can be changed later by asking you or any other agent.
+- They can stop at any point, and you pick up where you left off.
+- You will keep a task list, so they can see where they are.
+
+Something like:
+
+> This is a multi-step setup, and it will take a bit. Probably 30 to 45 minutes, depending on how much we
+> do. Some of it every project needs. The rest depends on how you like to work. Once the baseline is in,
+> any of it can be changed later. Ask me, or any of the other agents. You can stop at any point and we pick
+> up where we left off. I'll keep a task list so you can see where we are.
+
+Then give the scale. Seven steps. Three the harness cannot run without: the environment check, Trello, and
+the folder names and stack. Git, the optional tools and the other agents depend on the project.
+
+Trello ends in a restart of Claude Code, because Claude Code reads environment variables and MCP servers
+when it starts. So does the finish, so every agent boots with the filled-in files. Installing an optional
+MCP tool in step 5 needs one too.
+
+**About the range.** It is a feel for the size, not a promise. There is no way to be accurate about it.
+What drives the time is how much the user wants explained and how many of the optional steps they take.
+Say it once, say it depends, and move on. Do not revise it mid-setup, and do not apologise for it if
+setup runs long.
+
+## The task list
+
+Build it with `TodoWrite` at the start of every setup session, not only the first. Show it before the first
+question, so the user sees the shape of the thing before they answer anything.
+
+**The state is already on disk. Do not keep a separate progress file.** A step is done when the values it
+writes are filled in. Read them and derive the list:
+
+| Step | Done when |
+|---|---|
+| 1. Intentions and environment | `{{WORKSPACE_NAME}}`, `{{WORKSPACE_PURPOSE}}`, `{{WORKSPACE_RULES}}`, `{{OWNER_NAME}}`, `{{OWNER_ROLE}}`, `{{PROJECT_NAME}}`, `{{PROJECT_SUMMARY}}` are filled |
+| 2. Git and GitHub | `{{CODE_REMOTE}}`, `{{DOCS_REMOTE}}`, `{{DOCS_GIT}}`, `{{WORK_BRANCH}}`, `{{PUBLISH_BRANCH}}`, `{{BRANCH_MODEL}}`, `{{PUBLISH_EFFECT}}` are filled. `none` is a real answer |
+| 3. Trello | `{{BOARD_ID}}` in `board/board.conf`, plus `{{TRELLO_BOARD_ID}}`, `{{TRELLO_BOARD_NAME}}` and the six `{{LIST_ID_*}}`. Also `TRELLO_API_KEY` set in the shell and the `mcp__trello__*` tools present |
+| 4. Folders, names and stack | `{{CODE_DIR}}`, `{{STACK}}`, `{{COMMANDS}}`, `{{COMPONENT_FOLDERS}}`, `{{COMPONENT_LIBRARY}}`, `{{TOKEN_FILE}}` |
+| 5. Optional tools | `{{TOOLS}}`, `{{TEST_SUITE}}`, `{{SERVICE_REGISTRY}}`, and the four `{{STORYBOOK_*}}` if Storybook is in use |
+| 6. The other agents | `{{PROJECT_SLUG}}` filled, each chosen agent's `.claude/settings.local.json` holding its `autoMemoryDirectory`, and `BOARD_WATCHER` answered in `shared/preferences.conf` |
+| 7. Plan and boundaries | `{{PLAN_FILE}}`, `{{DECISIONS_FILE}}`, `{{REVIEW_BAR}}`, `{{BOUNDARIES}}` |
+
+Step 7 lists exactly where to search for unfilled values. Use those paths and nowhere else.
+
+How to mark them:
+
+- **In progress** when you start asking a step's questions. **Done** when its values are written to their
+  files, not when the user answers out loud.
+- **Skipped is finished.** A user who declines Storybook has completed step 5. Mark it done and say it was
+  skipped. Leaving it open reads as work outstanding when it is a decision already made.
+- **Never mark a step done from memory of an earlier session.** Read the files. After a restart, rebuild
+  the whole list from what is on disk.
+
+The list is also the answer to "what did I not set up". Rebuild it and show it.
+
 ## 1. Intentions and environment
 
 Ask what the user wants to build and why. Record it in the project `CLAUDE.md` under What this is.
