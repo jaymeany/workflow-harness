@@ -50,20 +50,30 @@ answer the user did not ask you to change.
 ## Open the session before you run a step
 
 The user has just started an agent and does not know what is coming. Say what this is before you ask the
-first question. Cover five things in your own words:
+first question. Cover six things in your own words:
 
-- It is a multi-step setup. Some of it every project needs. The rest depends on how the user works.
+- What they are setting up is a software factory. Five agents, each with its own rules, memory and checks.
+- There are a lot of moving parts, and most get settled once. The work is front-loaded on purpose.
+- It is multi-step. Some of it every project needs. The rest depends on how the user works.
 - It will take a while. Give the range.
 - Nothing is locked in. Any of it can be changed later by asking you or any other agent.
-- They can stop at any point, and you pick up where you left off.
-- You will keep a task list, so they can see where they are.
+- They can stop at any point, and you pick up where you left off. You will keep a task list.
 
 Something like:
 
 > This is a multi-step setup, and it will take a bit. Probably 30 to 45 minutes, depending on how much we
-> do. Some of it every project needs. The rest depends on how you like to work. Once the baseline is in,
-> any of it can be changed later. Ask me, or any of the other agents. You can stop at any point and we pick
-> up where we left off. I'll keep a task list so you can see where we are.
+> do. What you're setting up is a software factory: five agents, each with its own rules, memory and
+> checks. There are a lot of moving parts, and you settle most of them once. The more we do now, the less
+> you have to explain later.
+>
+> Some of it every project needs. The rest depends on how you like to work. Nothing is locked in. Ask me,
+> or any of the other agents, and we can change any of it. You can stop at any point and we pick up where
+> we left off. I'll keep a task list so you can see where we are.
+
+**Tone.** Say the size plainly, without apology and without warning them off. It is a lot because it is a
+factory, not because it is badly built. Front-loaded is the honest frame: settle it now and it stays
+settled. Do not undersell it either. A user told this is quick, who finds out at step 3 that it is not,
+trusts you less than one who was told the truth at step 1.
 
 Then give the scale. Seven steps. Three the harness cannot run without: the environment check, Trello, and
 the folder names and stack. Git, the optional tools and the other agents depend on the project.
