@@ -84,11 +84,12 @@
     ],
     "PreCompact": [
       {
+        "$comment": "Handoff gate on compaction. Matcher manual|auto covers BOTH paths: a context-wall freeze ends in a manual /compact, which would otherwise be the one ungated door. Refuses once per session when handoffs/designer-handoff-YYYY-MM-DD.md is missing or older than HANDOFF_FRESHNESS_SECONDS, then yields so a wedged session is never trapped. How hard it pushes is a preference: HANDOFF_GATE in ../shared/handoffs.conf is block, warn or off. ONE shared script serves every role, like board/board.sh. Fails open on missing $CLAUDE_PROJECT_DIR, missing handoffs dir, or an unstattable file.",
+        "matcher": "manual|auto",
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/precompact-write-handoff.sh",
-            "$comment": "Blocks auto-compaction until today's handoff is written."
+            "command": "\"$CLAUDE_PROJECT_DIR\"/../shared/precompact-write-handoff.sh"
           }
         ]
       }

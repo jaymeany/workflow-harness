@@ -36,7 +36,12 @@ SELF_NAME="$(basename "${BASH_SOURCE[0]}")"
 
 problems=()
 
-for hook_path in "$HOOKS_DIR"/*.sh; do
+# Shared hooks live outside this directory (../../../shared/), the way
+# board/board.sh does. They are still this role's hooks: settings.json points
+# at them and they run with this role's CLAUDE_PROJECT_DIR. Auditing only the
+# local directory would silently drop them from the fail-open check the moment
+# a hook was moved there.
+for hook_path in "$HOOKS_DIR"/*.sh "$HOOKS_DIR"/../../../shared/*.sh; do
   [[ -f "$hook_path" ]] || continue
   hook_name="$(basename "$hook_path")"
   [[ "$hook_name" == "$SELF_NAME" ]] && continue
