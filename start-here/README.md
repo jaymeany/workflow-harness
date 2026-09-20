@@ -38,6 +38,9 @@ The orchestrator walks you through setting up each of these.
 
 ## Begin
 
+If you used the install script, the orchestrator is already running and the folders are already named.
+Skip to it and answer its questions. The rest of this section is for a fork or a ZIP download.
+
 1. Open a terminal.
 2. Go to the orchestrator's folder:
 

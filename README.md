@@ -13,6 +13,27 @@ each other directly when they need an answer.
 
 You own the decisions. The agents surface them, frame the options and recommend.
 
+## Install
+
+Two lines in a terminal:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jaymeany/workflow-harness/main/install.sh -o harness-install.sh
+bash harness-install.sh
+```
+
+The script checks that your computer has what the hooks need, asks for a workspace name and a project
+name, downloads the harness into your home folder under those names, and starts the orchestrator. It
+downloads to a file first so you can read it before you run it.
+
+It asks for two names and nothing else. It never asks for a key, a token or a password.
+
+The orchestrator takes it from there. It speaks first, so there is nothing to paste and nothing to read
+ahead of time. It walks you through git, Trello, your stack, the optional tools and the other agents, one
+step at a time. You can stop at any point and pick up where you left off.
+
+See "What you need" below for the accounts and tools. The script checks the ones it can.
+
 The tools in this harness are my answers to problems any agent workflow runs into. They're my personal
 choices. You may have your own tooling for the same problems, and that's fine.
 
@@ -258,28 +279,24 @@ action, and the watcher. The hooks don't change.
 
 Git and GitHub are optional.
 
-## Get a copy
+## Get a copy another way
+
+The install script is the short path. Two others work:
 
 - Fork this repo on GitHub if you want to send improvements back.
-- Or download the ZIP. On the repo page, choose Code, then Download ZIP, and unzip it.
+- Download the ZIP. On the repo page, choose Code, then Download ZIP, and unzip it.
 
-Your copy is yours. Changes you make to it don't touch this repo.
-
-## Start
-
-Open [`start-here/README.md`](start-here/README.md). The short version:
+Either way you then start the orchestrator yourself:
 
 ```bash
 cd Primary-project-name/app-or-project-name/docs/agent-workflows/orchestrator
 claude
 ```
 
-Then say:
+You do not need to say anything in particular. The orchestrator checks for itself whether setup has been
+done and leads with it. [`start-here/README.md`](start-here/README.md) is the longer walk-through.
 
-> I am setting up. Run first start with me.
-
-Anything works, though. The orchestrator checks for itself whether setup has been done, and says so
-before it does anything else.
+Your copy is yours. Changes you make to it don't touch this repo.
 
 ## About
 
