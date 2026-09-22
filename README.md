@@ -3,6 +3,11 @@
 A team of Claude Code agents that plans, researches, designs, builds and reviews software. Each agent works
 by written rules, and hooks enforce those rules as the agent works.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset=".github/readme-hero-dark.png">
+  <img alt="A wireframe rendering of a three dimensional surface, drawn as a dense grid of fine lines. The terrain rises into several sharp peaks and falls away into valleys between them." src=".github/readme-hero-light.png" width="100%">
+</picture>
+
 ## The short version
 
 Five agents, each in its own terminal, pass work across a Trello board. One of them, the orchestrator,
