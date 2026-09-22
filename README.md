@@ -4,8 +4,8 @@ A team of Claude Code agents that plans, researches, designs, builds and reviews
 by written rules, and hooks enforce those rules as the agent works.
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme-hero-dark.png">
-  <img alt="A wireframe rendering of a three dimensional surface, drawn as a dense grid of fine lines. The terrain rises into several sharp peaks and falls away into valleys between them." src=".github/readme-hero-light.png" width="100%">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/readme-topology-dark.svg">
+  <img alt="A closed loop with four stations on it, marked research, design, dev and QA, and a chevron on each straight run showing the work travelling clockwise. A single small square on the loop is the card, the unit of work, and it is the only thing drawn as moving. Four dashed lines cross the interior, a separate channel the roles use to talk to each other." src=".github/readme-topology-light.svg" width="100%">
 </picture>
 
 ## The short version
