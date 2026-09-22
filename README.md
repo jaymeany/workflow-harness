@@ -1,7 +1,9 @@
 # Workflow harness
 
-A team of Claude Code agents that plans, researches, designs, builds and reviews software. Each agent works
-by written rules, and hooks enforce those rules as the agent works.
+A team of Claude Code agents that plans, researches, designs, builds and reviews software. This differs
+from the default harness functionality in that the separated roles are highly specialized and adversarial.
+The primary value is a software workflow governed by a deterministic ruleset rather than probabilistic
+prose resulting in repeatable, safer, more predictable outcomes.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset=".github/readme-topology-dark.svg">
