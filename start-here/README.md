@@ -24,14 +24,16 @@ You decide what gets built. When a decision is yours, an agent asks.
 Each agent runs in its own terminal window. You start the ones you need, in their own folders, and talk to
 them there. They also reach each other directly.
 
-You should be comfortable typing a few commands in a terminal. The orchestrator explains the rest as you go.
+You should be comfortable working in a terminal app. The board and Storybook have their own screens, but
+the work and the configuration happen in the terminal. The orchestrator explains the rest as you go.
 
 ## What you need
 
 - **A Mac or a Linux computer.** Windows works with changes. The orchestrator checks your computer and talks
   you through them.
 - **Claude Code**, and a Claude plan that includes it.
-- **A Trello account.** The board is where the agents pass work.
+- **A kanban board.** The board is where the agents pass work. Trello is the one that ships, so you need a
+  Trello account.
 - **Git and GitHub**, if your project uses them. They are not required.
 
 The orchestrator walks you through setting up each of these.

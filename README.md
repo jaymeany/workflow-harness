@@ -3,28 +3,49 @@
 A team of Claude Code agents that plans, researches, designs, builds and reviews software. Each agent works
 by written rules, and hooks enforce those rules as the agent works.
 
-I built this over a year of research and development, and I use it on my own work. I'm sharing it with
-anyone who wants to get more done with AI agents. Take it, change it, and make it yours. If you want to talk
-about how it works or how to adapt it, reach me through my GitHub profile, [@jaymeany](https://github.com/jaymeany).
+## The short version
 
-The team has five roles: Orchestrator, Research, Designer, Dev and QA. Each role runs as its own Claude Code
-session, in its own folder, with its own identity, mandate, protocol, hooks and memory. The roles message
-each other directly when they need an answer.
+Five agents, each in its own terminal, pass work across a Trello board. One of them, the orchestrator,
+plans the work and writes the cards. The others research, design, build and review. Hooks keep each one in
+its lane. You decide what gets built. When a decision is yours, an agent asks.
 
-You own the decisions. The agents surface them, frame the options and recommend.
-
-## Install
-
-Two lines in a terminal:
+It runs on any stack. You need a Mac or Linux computer, Claude Code, and a kanban board. Trello is the
+board adapter that ships. You should be comfortable working in a terminal app. The board and Storybook
+have their own screens, but the work and the configuration happen in the terminal. Two lines install it.
+The orchestrator then starts, speaks first, and walks you through the rest.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jaymeany/workflow-harness/main/install.sh -o harness-install.sh
 bash harness-install.sh
 ```
 
-The script checks that your computer has what the hooks need, asks for a workspace name and a project
-name, downloads the harness into your home folder under those names, and starts the orchestrator. It
-downloads to a file first so you can read it before you run it.
+That's all you need to start. [`start-here/README.md`](start-here/README.md) is the walk-through if you
+want one. Everything below is reference: how it's built, what the rules are, and how to change it.
+
+I built this over a year of research and development, and I use it on my own work. Take it, change it, and
+make it yours. If you want to talk about how it works or how to adapt it, reach me through my GitHub
+profile, [@jaymeany](https://github.com/jaymeany).
+
+## Contents
+
+- [Install](#install)
+- [Why the code holds up](#why-the-code-holds-up)
+- [How a role is built](#how-a-role-is-built)
+- [The roles](#the-roles)
+- [How work moves](#how-work-moves)
+- [What the hooks enforce](#what-the-hooks-enforce)
+- [Adapt it and extend it](#adapt-it-and-extend-it)
+- [What you need](#what-you-need)
+- [Get a copy another way](#get-a-copy-another-way)
+- [About](#about)
+- [License](#license)
+
+## Install
+
+The two lines above download the install script and run it. The script checks that your computer has what
+the hooks need, asks for a workspace name and a project name, downloads the harness into your home folder
+under those names, and starts the orchestrator. It downloads to a file first so you can read it before you
+run it.
 
 It asks for two names and nothing else. It never asks for a key, a token or a password.
 
@@ -87,6 +108,10 @@ puts it this way: "A hook firing is the user speaking in the moment." When a hoo
 reads what the hook says and takes the correct path. If it's stuck, it says so and escalates.
 
 ## The roles
+
+The team has five roles: Orchestrator, Research, Designer, Dev and QA. Each runs as its own Claude Code
+session, in its own folder, with its own identity, mandate, protocol, hooks and memory. The roles message
+each other directly when they need an answer.
 
 ### Orchestrator
 
@@ -289,9 +314,10 @@ action, and the watcher. The hooks don't change.
 
 - A Mac or Linux computer. On Windows, use WSL or Git Bash.
 - Claude Code 2.1.224 or later.
-- A Trello account, API key and token.
-- The Trello MCP server, [`@delorenj/mcp-server-trello`](https://github.com/delorenj/mcp-server-trello). It
-  isn't included.
+- A kanban board. The board is where the agents pass work. Trello is the adapter that ships, so with it you
+  need a Trello account, API key and token, and the Trello MCP server,
+  [`@delorenj/mcp-server-trello`](https://github.com/delorenj/mcp-server-trello). It isn't included. See
+  "Use another board" to swap Trello out.
 - `jq`, `curl`, `pgrep` and `git`.
 
 Git and GitHub are optional.
