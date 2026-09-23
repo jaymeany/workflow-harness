@@ -12,14 +12,16 @@ prose. The result is repeatable, safer, more predictable outcomes.
 
 ## The short version
 
-Five agents, each in its own terminal, pass work across a Trello board. One of them, the orchestrator,
-plans the work and writes the cards. The others research, design, build and review. Hooks keep each one in
-its lane. You decide what gets built. When a decision is yours, an agent asks.
+Five agents, each in its own terminal, pass work across a Trello board. The orchestrator works with you to
+plan the work and stubs cards for research. The others research the codebase, design the UI, build and
+QA/QC the output. Hooks keep each agent in their lane. You decide the what and the why and the order things
+are built. If a question related to the what, why, or priority order comes up, the agent will ask.
 
 It runs on any stack. You need a Mac or Linux computer, Claude Code, and a kanban board. Trello is the
-board adapter that ships. You should be comfortable working in a terminal app. The board and Storybook
-have their own screens, but the work and the configuration happen in the terminal. Two lines install it.
-The orchestrator then starts, speaks first, and walks you through the rest.
+board adapter that ships, but you can instruct the orchestrator to build one for others. The primary
+workflow rules are built to be universal. You should be comfortable working in a terminal app. The board
+and Storybook have their own screens, but the work and the configuration happen in the terminal. Two lines
+install it. Then the orchestrator starts, speaks first, and walks you through the rest.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jaymeany/workflow-harness/main/install.sh -o harness-install.sh
@@ -30,8 +32,9 @@ That's all you need to start. [`start-here/README.md`](start-here/README.md) is 
 want one. Everything below is reference: how it's built, what the rules are, and how to change it.
 
 I built this over a year of research and development, and I use it on my own work. Take it, change it, and
-make it yours. If you want to talk about how it works or how to adapt it, reach me through my site at
-[jaymeany.com](https://jaymeany.com) or GitHub profile, [@jaymeany](https://github.com/jaymeany).
+make it yours. If you want to talk about how it works or how to better adapt it to your way of working,
+reach me through my site at [jaymeany.com](https://jaymeany.com) or GitHub profile,
+[@jaymeany](https://github.com/jaymeany).
 
 ## Contents
 
