@@ -30,8 +30,8 @@ That's all you need to start. [`start-here/README.md`](start-here/README.md) is 
 want one. Everything below is reference: how it's built, what the rules are, and how to change it.
 
 I built this over a year of research and development, and I use it on my own work. Take it, change it, and
-make it yours. If you want to talk about how it works or how to adapt it, reach me through my GitHub
-profile, [@jaymeany](https://github.com/jaymeany).
+make it yours. If you want to talk about how it works or how to adapt it, reach me through my site at
+[jaymeany.com](https://jaymeany.com) or GitHub profile, [@jaymeany](https://github.com/jaymeany).
 
 ## Contents
 
