@@ -53,9 +53,9 @@ reach me through my site at [jaymeany.com](https://jaymeany.com) or GitHub profi
 ## Install
 
 The two lines above download the install script and run it. The script checks that your computer has what
-the hooks need, asks for a workspace name and a project name, downloads the harness into your home folder
-under those names, and starts the orchestrator. It downloads to a file first so you can read it before you
-run it.
+the hooks need, asks for a workspace name and a project name, downloads the harness into the folder you
+run it from under those names, and starts the orchestrator. It downloads to a file first so you can read it
+before you run it.
 
 It asks for two names and nothing else. It never asks for a key, a token or a password.
 

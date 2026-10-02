@@ -4,8 +4,8 @@
 #
 # It does four mechanical things and then gets out of the way: checks this
 # computer has what the hooks need, asks for a workspace name and a project
-# name, downloads the harness into your home folder under those names, and
-# starts the orchestrator.
+# name, downloads the harness into the folder you run it from under those
+# names, and starts the orchestrator.
 #
 # Renaming the two template folders is the one setup task that has to happen
 # while Claude Code is closed, because the agent sessions live inside them.
@@ -107,7 +107,9 @@ say ""
 say "The project is the first thing you will build in it."
 PROJECT="$(ask_name "  Project name" "project")"
 
-TARGET="$HOME/$WORKSPACE"
+HERE="$(pwd -P)"
+[ -w "$HERE" ] || die "Cannot write to $HERE. Change to a folder you own, then run this script again."
+TARGET="$HERE/$WORKSPACE"
 [ ! -e "$TARGET" ] || die "$TARGET already exists. Move it, or choose another workspace name, then run this script again."
 
 # ------------------------------------------------------------------ download
