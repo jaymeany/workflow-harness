@@ -53,11 +53,12 @@ reach me through my site at [jaymeany.com](https://jaymeany.com) or GitHub profi
 ## Install
 
 The two lines above download the install script and run it. The script checks that your computer has what
-the hooks need, asks for a workspace name and a project name, downloads the harness into the folder you
-run it from under those names, and starts the orchestrator. It downloads to a file first so you can read it
-before you run it.
+the hooks need, and asks whether the folder you run it from is your workspace. Answer yes to use that
+folder. Answer no and it asks for a workspace name and makes that folder inside the current one. Answer don't
+know and it explains, then asks again. Then it asks for a project name, downloads the harness there, and
+starts the orchestrator. It downloads to a file first so you can read it before you run it.
 
-It asks for two names and nothing else. It never asks for a key, a token or a password.
+It asks those questions and nothing else. It never asks for a key, a token or a password.
 
 The orchestrator takes it from there. It speaks first, so there is nothing to paste and nothing to read
 ahead of time. It walks you through git, Trello, your stack, the optional tools and the other agents, one

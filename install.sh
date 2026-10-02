@@ -3,9 +3,9 @@
 # Workflow harness installer.
 #
 # It does four mechanical things and then gets out of the way: checks this
-# computer has what the hooks need, asks for a workspace name and a project
-# name, downloads the harness into the folder you run it from under those
-# names, and starts the orchestrator.
+# computer has what the hooks need, asks whether the folder it runs from is the
+# workspace (and for a workspace name if not) and for a project name, downloads
+# the harness there under those names, and starts the orchestrator.
 #
 # Renaming the two template folders is the one setup task that has to happen
 # while Claude Code is closed, because the agent sessions live inside them.
@@ -85,7 +85,7 @@ say "  Claude Code   $claude_version"
 # --------------------------------------------------------------------- names
 # Renaming these folders is the one setup task that has to happen while Claude
 # Code is closed, because the orchestrator's session lives inside them.
-step "Two names. Letters, digits, hyphens and underscores."
+step "Where the workspace goes."
 
 ask_name() {
   local prompt="$1" default="$2" answer=""
@@ -101,16 +101,62 @@ ask_name() {
   done
 }
 
+HERE="$(pwd -P)"
+[ -w "$HERE" ] || die "Cannot write to $HERE. Change to a folder you own, then run this script again."
+
+explain_workspace() {
+  say "
+A workspace is the folder that holds your projects. Its CLAUDE.md holds the
+rules every agent in every project there follows. Each project is a folder
+inside it, with its own code, docs and agents.
+
+Answer y if this folder is that folder: an empty folder you made for it, or one
+where you already ran this installer for another project. Answer n to make a
+new workspace folder inside this one.
+
+This folder holds:" > /dev/tty
+  if [ -n "$(ls -A "$HERE" 2>/dev/null)" ]; then
+    ls -A "$HERE" | head -n 20 | sed 's/^/  /' > /dev/tty
+  else
+    say "  nothing" > /dev/tty
+  fi
+  say "" > /dev/tty
+}
+
+# Returns 0 for yes, 1 for no. "Don't know" explains and asks again.
+ask_workspace() {
+  local answer=""
+  while true; do
+    printf '  Is this folder the workspace? yes, no, or don'"'"'t know [y/n/d]: ' > /dev/tty
+    IFS= read -r answer < /dev/tty || die "No answer. Stopping."
+    case "$answer" in
+      y|Y|yes|Yes|YES) return 0 ;;
+      n|N|no|No|NO)    return 1 ;;
+      d|D|"don't know"|"Don't know"|"dont know"|"?") explain_workspace ;;
+      *) say "  Answer y, n or d." > /dev/tty ;;
+    esac
+  done
+}
+
 say "The workspace holds every project you run the harness on."
-WORKSPACE="$(ask_name "  Workspace name" "workspace")"
+say "You are in $HERE"
+if ask_workspace; then
+  # A workspace CLAUDE.md in the home folder would load into every Claude
+  # session on this computer, so the home folder cannot be the workspace.
+  [ "$HERE" != "$(cd "$HOME" && pwd -P)" ] || die "The home folder cannot be the workspace. Its CLAUDE.md would load into every Claude session on this computer.
+Make a folder for the workspace, change to it, and run this script again."
+  TARGET="$HERE"
+else
+  say "Names use letters, digits, hyphens and underscores."
+  WORKSPACE="$(ask_name "  Workspace name" "workspace")"
+  TARGET="$HERE/$WORKSPACE"
+  [ ! -e "$TARGET" ] || die "$TARGET already exists. Change to it and answer y, or choose another workspace name, then run this script again."
+fi
+
 say ""
 say "The project is the first thing you will build in it."
 PROJECT="$(ask_name "  Project name" "project")"
-
-HERE="$(pwd -P)"
-[ -w "$HERE" ] || die "Cannot write to $HERE. Change to a folder you own, then run this script again."
-TARGET="$HERE/$WORKSPACE"
-[ ! -e "$TARGET" ] || die "$TARGET already exists. Move it, or choose another workspace name, then run this script again."
+[ ! -e "$TARGET/$PROJECT" ] || die "$TARGET/$PROJECT already exists. Move it, or choose another project name, then run this script again."
 
 # ------------------------------------------------------------------ download
 step "Downloading the harness into $TARGET"
@@ -130,13 +176,23 @@ tar -xzf "$tmp/harness.tar.gz" -C "$tmp/unpacked" --strip-components=1 \
 [ -f "$tmp/unpacked/$WORKSPACE_SRC/CLAUDE.md" ] && [ -d "$tmp/unpacked/$WORKSPACE_SRC/$PROJECT_SRC" ] \
   || die "The download did not contain what was expected. Nothing was written."
 
-mv "$tmp/unpacked/$WORKSPACE_SRC" "$TARGET"
-mv "$TARGET/$PROJECT_SRC" "$TARGET/$PROJECT"
-[ -f "$tmp/unpacked/LICENSE" ] && mv "$tmp/unpacked/LICENSE" "$TARGET/LICENSE" || true
-find "$TARGET" -name '.DS_Store' -delete 2>/dev/null || true
+# The workspace folder may already exist, and may already hold a workspace
+# CLAUDE.md from an earlier project. An existing CLAUDE.md or LICENSE is kept.
+mkdir -p "$TARGET"
+mv "$tmp/unpacked/$WORKSPACE_SRC/$PROJECT_SRC" "$TARGET/$PROJECT"
+find "$TARGET/$PROJECT" -name '.DS_Store' -delete 2>/dev/null || true
 
 ORCHESTRATOR="$TARGET/$PROJECT/docs/agent-workflows/orchestrator"
-[ -d "$ORCHESTRATOR" ] || { rm -rf "$TARGET"; die "The orchestrator folder is missing. Nothing was kept."; }
+[ -d "$ORCHESTRATOR" ] || { rm -rf "$TARGET/$PROJECT"; die "The orchestrator folder is missing. Nothing was kept."; }
+
+if [ -e "$TARGET/CLAUDE.md" ]; then
+  say "  kept          $TARGET/CLAUDE.md, which was already there"
+else
+  mv "$tmp/unpacked/$WORKSPACE_SRC/CLAUDE.md" "$TARGET/CLAUDE.md"
+fi
+if [ ! -e "$TARGET/LICENSE" ] && [ -f "$tmp/unpacked/LICENSE" ]; then
+  mv "$tmp/unpacked/LICENSE" "$TARGET/LICENSE"
+fi
 
 say "  workspace     $TARGET"
 say "  project       $TARGET/$PROJECT"
