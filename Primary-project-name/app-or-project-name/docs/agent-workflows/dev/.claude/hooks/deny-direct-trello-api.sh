@@ -4,8 +4,9 @@
 #
 # Denies any Bash command that calls the Trello API directly (curl/wget
 # against api.trello.com). Forces Trello operations through the MCP tool
-# layer (mcp__trello__*) so Dev's column-scope, description-write,
-# implementation-notes, and per-card-commit gates run on every change.
+# layer (mcp__trello__*) so this role's board gates run on every change.
+# The same file serves the orchestrator, Designer and Dev, so the message
+# names no one role's hooks.
 #
 # Why: every Trello gate in this directory matches on mcp__trello__* tool
 # names. A Bash `curl https://api.trello.com/...` bypasses them entirely —
@@ -59,20 +60,13 @@ if echo "$cmd" | grep -qiE "$BOARD_API_URL_ERE"; then
   cat >&2 <<'EOF'
 BLOCKED: direct Trello API call from Bash.
 
-Use the MCP Trello tools (mcp__trello__*) instead of curl/wget to
-api.trello.com. Direct API calls bypass Dev's enforcement hooks:
-  - gate-column-scope.sh        (update only cards in "Now")
-  - block-description-writes.sh (no description writes — that's Research's)
-  - gate-implementation-notes.sh (§6 notes required on move to Ready for QA)
-  - gate-per-card-commit.sh     (#<card> commit subject on move to Ready for QA)
-  - apply-needs-research-label.sh (label-on-bounce to Research and prep)
+Use the MCP Trello tools (mcp__trello__*) instead of curl or wget to
+api.trello.com. This role's board gates in .claude/hooks/ match on
+mcp__trello__* tool names, so a direct API call skips all of them.
 
-All enforcement hooks are scoped to mcp__trello__* matchers. Bypassing
-MCP means none of them run on your changes.
-
-If batch operations are slow, send multiple mcp__trello__* calls in
-parallel (one message, multiple tool uses) — don't shell out. The
-read-only column watcher is exempt: it runs via the Monitor tool.
+If batch operations are slow, send several mcp__trello__* calls in
+parallel, in one message. Do not shell out. The read-only column
+watcher is exempt: it runs via the Monitor tool.
 EOF
   exit 2
 fi
