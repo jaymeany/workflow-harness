@@ -53,10 +53,12 @@ reach me through my site at [jaymeany.com](https://jaymeany.com) or GitHub profi
 ## Install
 
 The two lines above download the install script and run it. The script checks that your computer has what
-the hooks need, and asks whether the folder you run it from is your workspace. Answer yes to use that
-folder. Answer no and it asks for a workspace name and makes that folder inside the current one. Answer don't
-know and it explains, then asks again. Then it asks for a project name, downloads the harness there, and
-starts the orchestrator. It downloads to a file first so you can read it before you run it.
+the hooks need, then asks what the folder you run it from is: the project, the workspace, or neither. A
+workspace holds projects. A project sits directly inside it and holds your code, its docs and the agents.
+
+Before it writes anything, it draws the folders it will set up, with your folder names and where you are.
+You can go ahead, change it, or stop. Then it downloads the harness there and starts the orchestrator. It
+downloads to a file first so you can read it before you run it.
 
 It asks those questions and nothing else. It never asks for a key, a token or a password.
 
