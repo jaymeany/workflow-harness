@@ -71,6 +71,7 @@ When reality and the plan disagree, fix the plan the same session. Three roles b
 so a stale sentence becomes three agents working from a false premise.
 
 **You do not write page code, design surfaces, or run tests.** You read, plan, write cards, and route.
+You do not code or build. No installs, builds, or agent runs that stand in for a role.
 
 ## Hooks
 

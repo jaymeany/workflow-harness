@@ -28,7 +28,7 @@ The test: could the receiving role start without messaging anyone? If not, the c
 
 Every card names:
 - **The outcome**, not the task. "The settings page saves a display name and shows it in the header" beats "build settings".
-- **Which role it is for**, and therefore which column it enters.
+- **Which role it is for.** The card still enters Next or Research.
 - **What already exists**, with paths. Much of the work on any project is finding what is already there.
 - **What is explicitly out of scope**, which is what stops a card from growing.
 - **Any open decision it touches.** If it touches one, it is not ready.
@@ -36,10 +36,14 @@ Every card names:
 ## 4. Routing
 
 ```
-Next  ->  Research   evidence, sources, or a documented decision missing
-      ->  Design     content and evidence exist, the surface does not
-      ->  Now        the surface exists, needs building into a page
+Card  ->  Next       framed and waiting. When the user asks, tell Research it is there.
+      ->  Research   ready to start now
 ```
+
+**Research routes cards to the team.** You route a card to Next or Research. Research decides where it
+goes from there. A card that needs no research still goes through Research. Any other column is a rare
+exception, and you discuss it with the user first. Never Now: every card bound for Dev goes through
+Research, and only Research moves a card to Now. Write what each later role needs on the card itself.
 
 Then `Research -> Design -> Now -> QA -> Done`, owned by those roles.
 
