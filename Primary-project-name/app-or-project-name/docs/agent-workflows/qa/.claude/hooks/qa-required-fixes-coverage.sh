@@ -151,7 +151,7 @@ prior_fix_count=$(echo "$prior_fail" | awk '
   /^### Required Fixes/ { flag = 1; next }
   /^### / { flag = 0 }
   flag
-' | grep -cE '^[[:space:]]*([0-9]+\.|-)[[:space:]]+\S')
+' | grep -cE '^[[:space:]]*([0-9]+\.|-)[[:space:]]+\S' || true)
 
 if [[ "$prior_fix_count" -lt 1 ]]; then
   # Prior FAIL had no enumerable fixes — nothing to verify. Pass.
@@ -186,7 +186,7 @@ addressed_count=$(echo "$latest_qa" | awk -v hdr="^### Iteration ${iteration} Fi
   $0 ~ hdr { flag = 1; next }
   /^### / { flag = 0 }
   flag
-' | grep -cE '^[[:space:]]*([0-9]+\.|-)[[:space:]]+\S')
+' | grep -cE '^[[:space:]]*([0-9]+\.|-)[[:space:]]+\S' || true)
 
 if [[ "$addressed_count" -lt "$prior_fix_count" ]]; then
   cat >&2 <<EOF

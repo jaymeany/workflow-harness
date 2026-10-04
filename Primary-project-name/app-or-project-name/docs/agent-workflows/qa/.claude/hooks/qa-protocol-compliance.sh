@@ -353,7 +353,7 @@ EOF
     /^### Bounce Reason/ { flag = 1; next }
     /^### / { flag = 0 }
     flag
-  ' | grep -v '^[[:space:]]*\[' | grep -v '^[[:space:]]*-[[:space:]]*\[' | grep -v '^[[:space:]]*$')
+  ' | grep -v '^[[:space:]]*\[' | grep -v '^[[:space:]]*-[[:space:]]*\[' | grep -v '^[[:space:]]*$' || true)
 
   if [[ -z "$bounce_body" ]]; then
     cat >&2 <<'EOF'
