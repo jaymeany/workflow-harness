@@ -62,8 +62,9 @@ Card  ->  Next       framed and waiting. When the user asks, tell Research it is
 
 **Research routes cards to the team.** You route cards to Next, Research or Design. Any other column is
 a rare exception, and you discuss it with the user first. Never Now: every card bound for Dev goes through
-Research, and only Research moves a card to Now. You do not message Dev, Design or QA to start work.
-Instructions for the later roles go on the card.
+Research, and only Research moves a card to Now. You can message any role, but you do not direct Dev,
+Design or QA unless the user asks. Instructions for the later roles go on the card. The reasoning is in
+`CLAUDE.md` § Your scope, and why.
 
 Flow after you: `Research -> Design -> Now -> QA -> Done`.
 
