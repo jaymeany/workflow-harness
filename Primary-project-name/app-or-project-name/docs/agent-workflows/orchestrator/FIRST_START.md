@@ -164,6 +164,11 @@ no remote. Record how the docs folder is tracked in the docs `CLAUDE.md` under G
 Record the work branch, the publishing branch, and the model in the project `CLAUDE.md`. If the work branch
 does not exist yet, help the user create it.
 
+**You do not push, and neither does the user.** Your hook blocks `git push`. Dev pushes the code and QA
+pushes the docs repo. For a new repo, create it on GitHub with `gh repo create` and no `--push`, add the
+remote, and make the branches and the first commit locally. Do not hand the user a push to run. Mark the
+first push as pending in the task list. It goes to Dev and QA once setup is done.
+
 ## 3. Trello
 
 Trello is required. The agents pass work along a Trello board.
@@ -348,6 +353,10 @@ When no `{{` remains outside this file, tell the user setup is done. Then:
 2. Remind them how to start each agent they chose, from step 6.
 3. Tell them they can come back to you any time to change any of it, and that they do not need to
    remember what they skipped. Asking is enough.
+4. If step 2 left a first push pending, say who does it: Dev pushes the code repo and QA pushes the docs
+   repo. When `ListAgents` shows them running, send each one a message with `SendMessage` naming the repo
+   and the branches to push. If they are not running yet, record the pending push in your handoff and send
+   the messages when they are.
 
 **If some placeholders are still unfilled, do not call setup done.** List what is left, say what each one
 affects, and say which are optional. Then let the user choose. A user who knowingly leaves Storybook unset

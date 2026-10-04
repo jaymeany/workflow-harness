@@ -45,27 +45,22 @@ fi
 
 # `git push` is the outward-facing, irreversible action reachable from this
 # harness, and nothing on screen at the moment of typing says so.
-# protocol/Dev_Build.md §10 states the rule in prose; this is the gate behind
-# it. Pushing is the user's call, never a card's. Blocks every push, not only
-# force pushes.
+# Dev pushes the code and QA pushes the docs repo; the orchestrator never
+# does. Blocks every push, not only force pushes.
 if printf '%s' "$cmd" | grep -qE '(^|[[:space:]]|&&|;)git([[:space:]]+-C[[:space:]]+[^[:space:]]+)?[[:space:]]+push([[:space:]]|$)'; then
   cat >&2 <<'MSG'
 BLOCKED: git push.
 
-Pushing is the user's decision, never a card's.
+The orchestrator does not push. Dev pushes the code and QA pushes the
+docs repo, each under the branch model in the project CLAUDE.md.
 
-  {{CODE_DIR}}/    the code. Merging and pushing is the user's call.
-                   Commit freely; do not push.
-  docs/            the docs repo.
-  {{STORYBOOK_DIR}}/    the Storybook workbench, if the project has one.
+Commit locally if you need to, then hand the push over:
 
-Commit and stop there:
+  - If Dev or QA is running (ListAgents), send it a message with
+    SendMessage naming the repo and the branches to push.
+  - If not, record the pending push in your handoff.
 
-  cd ../../../{{CODE_DIR}}
-  git commit -m "#<card> <what changed>"
-
-Then move the card to QA. If a card genuinely cannot complete without a push,
-that is a bounce to Research, not a workaround.
+Do not ask the user to push from a terminal.
 MSG
   exit 2
 fi
