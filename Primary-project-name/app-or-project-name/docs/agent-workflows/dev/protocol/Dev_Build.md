@@ -35,7 +35,7 @@ instead of reading a re-narration in a comment.
 | Repo | Branch | Holds |
 |---|---|---|
 | `../../../{{CODE_DIR}}` | `{{WORK_BRANCH}}` | the code |
-| `../../` (docs) | `main` | the harness and the plan |
+| `../../` (docs) | `main` | the plan, handoffs and docs. Not `agent-workflows/`, which is local only |
 | `../../../{{STORYBOOK_DIR}}` | `{{STORYBOOK_BRANCH}}` | the Storybook workbench, if the project has one |
 
 The branch model for the code, from the work branch through to the publishing branch, is in the project
