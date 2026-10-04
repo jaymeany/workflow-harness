@@ -30,121 +30,162 @@ WORKSPACE_SRC="Primary-project-name"
 PROJECT_SRC="app-or-project-name"
 MIN_CLAUDE="2.1.224"
 
-say()  { printf '%s\n' "$*"; }
-step() { printf '\n%s\n' "$*"; }
-die()  { printf '\n%s\n' "$*" >&2; exit 1; }
+# ------------------------------------------------------------------- styling
+# Color only on a terminal, and never when NO_COLOR is set (no-color.org).
+if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != dumb ]; then
+  B=$'\033[1m' D=$'\033[2m' C=$'\033[36m' G=$'\033[32m' Y=$'\033[33m' R=$'\033[31m' N=$'\033[0m'
+else
+  B="" D="" C="" G="" Y="" R="" N=""
+fi
+
+TOTAL_STEPS=4
+
+say()  { printf '%s\n' "$*" > /dev/tty; }
+dim()  { printf '%s%s%s\n' "$D" "$*" "$N" > /dev/tty; }
+ok()   { printf '  %s✓%s %-13s %s\n' "$G" "$N" "$1" "$2" > /dev/tty; }
+warn() { printf '\n  %s!%s %s\n' "$Y" "$N" "$1" > /dev/tty; shift; for l in "$@"; do say "    $l"; done; }
+die()  { printf '\n  %s✗%s %s\n' "$R" "$N" "$1" >&2; shift; for l in "$@"; do printf '    %s\n' "$l" >&2; done; exit 1; }
+
+# A numbered section header with a rule to the right.
+section() {
+  local n="$1" title="$2" label rule
+  label="$n of $TOTAL_STEPS  $title"
+  rule="$(printf '%*s' $(( 60 - ${#label} )) '' | sed 's/ /─/g')"
+  printf '\n%s%s%s of %s%s  %s%s%s %s%s%s\n\n' "$C" "$B" "$n" "$TOTAL_STEPS" "$N" "$B" "$title" "$N" "$D" "$rule" "$N" > /dev/tty
+}
+
+# The start of a question line.
+ask() { printf '\n  %s?%s %s%s%s ' "$C" "$N" "$B" "$1" "$N" > /dev/tty; }
+
+# One option in a list: key, then what it does.
+option() { printf '      %s%s%s  %s\n' "$C$B" "$1" "$N" "$2" > /dev/tty; }
 
 # ---------------------------------------------------------------- pipe guard
 # A piped script shares stdin with the pipe, so the questions below would read
 # the script's own text and Claude Code would have no terminal to start in.
 if [ ! -t 0 ]; then
-  die "Run this from a file, not a pipe:
-
-  curl -fsSL https://raw.githubusercontent.com/$REPO/$BRANCH/install.sh -o harness-install.sh
-  bash harness-install.sh"
+  die "Run this from a file, not a pipe:" "" \
+    "curl -fsSL https://raw.githubusercontent.com/$REPO/$BRANCH/install.sh -o harness-install.sh" \
+    "bash harness-install.sh"
 fi
 
-say "Workflow harness installer"
+say ""
+printf '  %sWorkflow harness installer%s\n' "$B" "$N" > /dev/tty
+dim "  github.com/$REPO"
 
 # ----------------------------------------------------------------- preflight
-step "Checking this computer."
+section 1 "Checking this computer"
 
 os="$(uname -s)"
 case "$os" in
-  Darwin) say "  system        Mac" ;;
-  Linux)  say "  system        Linux" ;;
-  *)      die "This is $os. The hooks are bash scripts and need a bash shell.
-On Windows, install WSL and run this script inside it, where everything works as on Linux." ;;
+  Darwin) ok "system" "Mac" ;;
+  Linux)  ok "system" "Linux" ;;
+  *)      die "This is $os. The hooks are bash scripts and need a bash shell." \
+            "On Windows, install WSL and run this script inside it, where everything works as on Linux." ;;
 esac
 
 missing=""
 for tool in git curl jq pgrep; do
   command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
 done
-[ -z "$missing" ] || die "Missing:$missing
+[ -z "$missing" ] || die "Missing:$missing" "" \
+  "The hooks need these. A hook that cannot find its tool allows everything without" \
+  "checking, so install them before going on." \
+  "  Mac:   brew install${missing}" \
+  "  Linux: use your package manager"
+ok "tools" "git, curl, jq, pgrep"
 
-The hooks need these. A hook that cannot find its tool allows everything without
-checking, so install them before going on.
-  Mac:   brew install${missing}
-  Linux: use your package manager"
-say "  tools         git, curl, jq, pgrep"
-
-command -v claude >/dev/null 2>&1 || die "Claude Code is not installed, or is not on PATH.
-Install it, open a new terminal, and run this script again."
+command -v claude >/dev/null 2>&1 || die "Claude Code is not installed, or is not on PATH." \
+  "Install it, open a new terminal, and run this script again."
 
 claude_version="$(claude --version 2>/dev/null | awk '{print $1}')"
 [ -n "$claude_version" ] || die "Could not read the Claude Code version from 'claude --version'."
 oldest="$(printf '%s\n%s\n' "$MIN_CLAUDE" "$claude_version" | sort -V | head -n1)"
 if [ "$oldest" != "$MIN_CLAUDE" ] && [ "$claude_version" != "$MIN_CLAUDE" ]; then
-  die "Claude Code $claude_version is older than $MIN_CLAUDE.
-The agents reach each other with ListAgents and SendMessage, which need $MIN_CLAUDE or later.
-Run 'claude update', then run this script again."
+  die "Claude Code $claude_version is older than $MIN_CLAUDE." \
+    "The agents reach each other with ListAgents and SendMessage, which need $MIN_CLAUDE or later." \
+    "Run 'claude update', then run this script again."
 fi
-say "  Claude Code   $claude_version"
+ok "Claude Code" "$claude_version"
 
 # --------------------------------------------------------------------- names
 # Renaming these folders is the one setup task that has to happen while Claude
 # Code is closed, because the orchestrator's session lives inside them.
-step "Where the harness goes."
+section 2 "Where the harness goes"
 
 ask_name() {
   local prompt="$1" default="$2" answer=""
   while true; do
-    printf '%s [%s]: ' "$prompt" "$default" > /dev/tty
+    ask "$prompt"
+    printf '%s[%s]%s ' "$D" "$default" "$N" > /dev/tty
     IFS= read -r answer < /dev/tty || die "No answer. Stopping."
     [ -n "$answer" ] || answer="$default"
     if printf '%s' "$answer" | grep -Eq '^[A-Za-z0-9][A-Za-z0-9_-]*$'; then
       printf '%s' "$answer"
       return 0
     fi
-    say "  Use letters, digits, hyphens and underscores. No spaces or slashes." > /dev/tty
+    warn "Use letters, digits, hyphens and underscores. No spaces or slashes."
   done
 }
 
 HERE="$(pwd -P)"
 HOME_DIR="$(cd "$HOME" && pwd -P)"
-[ -w "$HERE" ] || die "Cannot write to $HERE. Change to a folder you own, then run this script again."
+[ -w "$HERE" ] || die "Cannot write to $HERE." "Change to a folder you own, then run this script again."
+
+# One line of a tree: prefix, folder name, note, and an optional marker.
+# printf pads by bytes and the box-drawing characters are three bytes each,
+# so pad by hand from a plain copy.
+row() {
+  local prefix="$1" name="$2" note="$3" mark="${4:-}" plain pad
+  plain="${prefix//└──/xxx}$name"
+  pad=$(( 34 - ${#plain} ))
+  [ "$pad" -ge 1 ] || pad=1
+  printf '    %s%s%s%s%s%s%*s%s%s%s' "$D" "$prefix" "$N" "$B" "$name" "$N" "$pad" "" "$D" "$note" "$N" > /dev/tty
+  [ -z "$mark" ] || printf '  %s◀ %s%s' "$Y" "$mark" "$N" > /dev/tty
+  printf '\n' > /dev/tty
+}
 
 # The hooks find the project three levels up from an agent's folder, and the
 # workspace one level above that. So the project must sit directly inside the
 # workspace. Any folders above the workspace are the user's own business.
-say "The harness needs this shape. The project sits directly inside the workspace.
-
-  workspace/                 CLAUDE.md: rules for every project in it
-  └── project/               CLAUDE.md, your code, docs/
-      └── docs/agent-workflows/
-          └── orchestrator/  and research, designer, dev, qa
-
-Folders above the workspace can be anything.
-
-You are in $HERE" > /dev/tty
+say "  The harness needs this shape. The project sits directly inside the workspace."
+say ""
+row ""                    "workspace/"          "CLAUDE.md: rules for every project in it"
+row "└── "                "project/"            "CLAUDE.md, your code, docs/"
+row "    └── "            "docs/agent-workflows/" ""
+row "        └── "        "orchestrator/"       "and research, designer, dev, qa"
+say ""
+dim "  Folders above the workspace can be anything."
+say ""
+printf '  You are in %s%s%s\n' "$B" "$HERE" "$N" > /dev/tty
 
 show_here() {
-  say "
-This folder holds:" > /dev/tty
+  say ""
+  say "  This folder holds:"
   if [ -n "$(ls -A "$HERE" 2>/dev/null)" ]; then
-    ls -A "$HERE" | head -n 20 | sed 's/^/  /' > /dev/tty
+    ls -A "$HERE" | head -n 20 | while IFS= read -r f; do dim "      $f"; done
   else
-    say "  nothing" > /dev/tty
+    dim "      nothing"
   fi
-  say "
-Choose p if this folder is the one project, empty or holding its code.
-Choose w if it holds your projects, or will.
-Choose n to keep the harness in a new folder of its own, below this one." > /dev/tty
+  say ""
+  say "  Choose p if this folder is the one project, empty or holding its code."
+  say "  Choose w if it holds your projects, or will."
+  say "  Choose n to keep the harness in a new folder of its own, below this one."
 }
 
 # Sets LAYOUT to p, w or n. "Don't know" shows the folder and asks again.
 ask_layout() {
   local answer=""
-  say "
-What is this folder?
-  p  the project. The harness goes in here.
-  w  the workspace. A new project folder goes inside it.
-  n  neither. A new workspace folder goes inside it, with the project inside that.
-  d  don't know
-  q  stop" > /dev/tty
+  say ""
+  printf '  %sWhat is this folder?%s\n' "$B" "$N" > /dev/tty
+  say ""
+  option p "the project. The harness goes in here."
+  option w "the workspace. A new project folder goes inside it."
+  option n "neither. A new workspace folder goes inside it, with the project inside that."
+  option d "don't know"
+  option q "stop"
   while true; do
-    printf '  Choose p, w, n or d: ' > /dev/tty
+    ask "Choose p, w, n, d or q:"
     IFS= read -r answer < /dev/tty || die "No answer. Stopping."
     case "$answer" in
       p|P) LAYOUT=p; return 0 ;;
@@ -152,7 +193,7 @@ What is this folder?
       n|N) LAYOUT=n; return 0 ;;
       d|D|"?") show_here ;;
       q|Q) die "Stopped. Nothing was written." ;;
-      *) say "  Choose p, w, n or d." > /dev/tty ;;
+      *) warn "Choose p, w, n, d or q." ;;
     esac
   done
 }
@@ -164,62 +205,49 @@ plan() {
   case "$LAYOUT" in
     p) PROJECT_DIR="$HERE"; WS_DIR="$(dirname "$HERE")"; PROJECT="$(basename "$HERE")" ;;
     w) WS_DIR="$HERE"
-       PROJECT="$(ask_name "  Project name" "${PROJECT:-project}")"
+       PROJECT="$(ask_name "Project name" "${PROJECT:-project}")"
        PROJECT_DIR="$WS_DIR/$PROJECT" ;;
-    n) WORKSPACE="$(ask_name "  Workspace name" "${WORKSPACE:-workspace}")"
+    n) WORKSPACE="$(ask_name "Workspace name" "${WORKSPACE:-workspace}")"
        WS_DIR="$HERE/$WORKSPACE"
-       PROJECT="$(ask_name "  Project name" "${PROJECT:-project}")"
+       PROJECT="$(ask_name "Project name" "${PROJECT:-project}")"
        PROJECT_DIR="$WS_DIR/$PROJECT" ;;
   esac
 
   # A workspace CLAUDE.md in the home folder would load into every Claude
   # session on this computer, so the home folder cannot be the workspace.
   if [ "$WS_DIR" = "$HOME_DIR" ] || [ "$PROJECT_DIR" = "$HOME_DIR" ]; then
-    say "
-  That makes the home folder the $( [ "$WS_DIR" = "$HOME_DIR" ] && echo workspace || echo project ). Its CLAUDE.md would load
-  into every Claude session on this computer. Choose another layout, or make a
-  folder for the harness, change to it, and run this script again." > /dev/tty
+    warn "That makes the home folder the $( [ "$WS_DIR" = "$HOME_DIR" ] && echo workspace || echo project )." \
+      "Its CLAUDE.md would load into every Claude session on this computer." \
+      "Choose another layout, or make a folder for the harness, change to it," \
+      "and run this script again."
     return 1
   fi
   if [ "$LAYOUT" = n ] && [ -e "$WS_DIR" ]; then
-    say "
-  $WS_DIR already exists. Choose another workspace name, or change to it and choose w." > /dev/tty
+    warn "$WS_DIR already exists." "Choose another workspace name, or change to it and choose w."
     return 1
   fi
   if [ "$LAYOUT" != p ] && [ -e "$PROJECT_DIR" ]; then
-    say "
-  $PROJECT_DIR already exists. Choose another project name, or change to it and choose p." > /dev/tty
+    warn "$PROJECT_DIR already exists." "Choose another project name, or change to it and choose p."
     return 1
   fi
   if [ "$LAYOUT" = p ]; then
     for name in CLAUDE.md docs; do
       if [ -e "$PROJECT_DIR/$name" ]; then
-        say "
-  This folder already has $name, and the harness would write its own.
-  Move it aside, or choose another layout." > /dev/tty
+        warn "This folder already has $name, and the harness would write its own." \
+          "Move it aside, or choose another layout."
         return 1
       fi
     done
     if [ ! -e "$WS_DIR/CLAUDE.md" ] && [ ! -w "$WS_DIR" ]; then
-      say "
-  Cannot write the workspace CLAUDE.md to $WS_DIR. Choose another layout." > /dev/tty
+      warn "Cannot write the workspace CLAUDE.md to $WS_DIR." "Choose another layout."
       return 1
     fi
   fi
   return 0
 }
 
-# One line of the tree: indent, folder name, note. printf pads by bytes and
-# the box-drawing characters are three bytes each, so pad by hand.
-row() {
-  local plain="${1//└──/xxx}"
-  local pad=$(( 32 - ${#plain} ))
-  [ "$pad" -ge 1 ] || pad=1
-  printf '  %s%*s%s\n' "$1" "$pad" "" "$2" > /dev/tty
-}
-
 draw_plan() {
-  local ws_name ws_note proj_note
+  local ws_name ws_note proj_note ws_mark="" proj_mark=""
   ws_name="$(basename "$WS_DIR")/"
   if [ ! -e "$WS_DIR" ]; then
     ws_note="workspace. New folder, with CLAUDE.md."
@@ -229,44 +257,46 @@ draw_plan() {
     ws_note="workspace. CLAUDE.md is added."
   fi
   if [ "$LAYOUT" = p ]; then
-    proj_note="project. You are here. CLAUDE.md and docs/ are added."
+    proj_note="project. CLAUDE.md and docs/ are added."
+    proj_mark="you are here"
   else
     proj_note="project. New folder."
   fi
-  [ "$LAYOUT" = w ] && ws_note="$ws_note You are here."
+  [ "$LAYOUT" = w ] && ws_mark="you are here"
 
-  say "
-This is what will be set up.
-" > /dev/tty
+  say ""
+  printf '  %sThis is what will be set up.%s\n' "$B" "$N" > /dev/tty
+  say ""
   if [ "$LAYOUT" = n ]; then
-    say "In $(dirname "$HERE")" > /dev/tty
-    say "" > /dev/tty
-    row "$(basename "$HERE")/" "You are here."
-    row "└── $ws_name" "$ws_note"
-    row "    └── $PROJECT/" "$proj_note"
-    row "        └── docs/agent-workflows/" "The five agents. The orchestrator starts here."
+    dim "  In $(dirname "$HERE")"
+    say ""
+    row ""             "$(basename "$HERE")/"   ""                 "you are here"
+    row "└── "         "$ws_name"               "$ws_note"
+    row "    └── "     "$PROJECT/"              "$proj_note"
+    row "        └── " "docs/agent-workflows/"  "the five agents"
   else
-    say "In $(dirname "$WS_DIR")" > /dev/tty
-    say "" > /dev/tty
-    row "$ws_name" "$ws_note"
-    row "└── $PROJECT/" "$proj_note"
-    row "    └── docs/agent-workflows/" "The five agents. The orchestrator starts here."
+    dim "  In $(dirname "$WS_DIR")"
+    say ""
+    row ""             "$ws_name"               "$ws_note"         "$ws_mark"
+    row "└── "         "$PROJECT/"              "$proj_note"       "$proj_mark"
+    row "    └── "     "docs/agent-workflows/"  "the five agents"
   fi
-  say "
-Anything already in these folders is left alone." > /dev/tty
+  say ""
+  dim "  Anything already in these folders is left alone."
 }
 
 # Returns 0 to go ahead, 1 to edit. q stops.
 confirm_plan() {
   local answer=""
   while true; do
-    printf '\n  Set it up like this? y to go ahead, e to change it, q to stop [y/e/q]: ' > /dev/tty
+    ask "Set it up like this?"
+    printf '%sy%s go ahead  %se%s change it  %sq%s stop: ' "$C$B" "$N" "$C$B" "$N" "$C$B" "$N" > /dev/tty
     IFS= read -r answer < /dev/tty || die "No answer. Stopping."
     case "$answer" in
       y|Y|yes|Yes|YES) return 0 ;;
       e|E) return 1 ;;
       q|Q) die "Stopped. Nothing was written." ;;
-      *) say "  Answer y, e or q." > /dev/tty ;;
+      *) warn "Answer y, e or q." ;;
     esac
   done
 }
@@ -280,7 +310,7 @@ while true; do
 done
 
 # ------------------------------------------------------------------ download
-step "Downloading the harness."
+section 3 "Setting it up"
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -298,6 +328,7 @@ src="$tmp/unpacked/$WORKSPACE_SRC/$PROJECT_SRC"
 [ -f "$tmp/unpacked/$WORKSPACE_SRC/CLAUDE.md" ] && [ -d "$src/docs/agent-workflows/orchestrator" ] \
   || die "The download did not contain what was expected. Nothing was written."
 find "$src" -name '.DS_Store' -delete 2>/dev/null || true
+ok "downloaded" "github.com/$REPO"
 
 # The project folder may already exist and hold the user's own files. Check
 # every name first, so a clash stops before anything is written.
@@ -316,31 +347,33 @@ done
 # The workspace may already hold a CLAUDE.md, from an earlier project or the
 # user's own. An existing one is kept. The LICENSE travels with a new one.
 if [ -e "$WS_DIR/CLAUDE.md" ]; then
-  say "  kept          $WS_DIR/CLAUDE.md, which was already there"
+  ok "workspace" "$WS_DIR"
+  dim "                  its CLAUDE.md was already there and is kept"
 else
   mv "$tmp/unpacked/$WORKSPACE_SRC/CLAUDE.md" "$WS_DIR/CLAUDE.md"
   if [ ! -e "$WS_DIR/LICENSE" ] && [ -f "$tmp/unpacked/LICENSE" ]; then
     mv "$tmp/unpacked/LICENSE" "$WS_DIR/LICENSE"
   fi
+  ok "workspace" "$WS_DIR"
 fi
 
 ORCHESTRATOR="$PROJECT_DIR/docs/agent-workflows/orchestrator"
-say "  workspace     $WS_DIR"
-say "  project       $PROJECT_DIR"
-say "  orchestrator  $ORCHESTRATOR"
+ok "project" "$PROJECT_DIR"
+ok "orchestrator" "$ORCHESTRATOR"
 
 # -------------------------------------------------------------------- hand off
-step "Starting the orchestrator. It takes it from here.
+section 4 "Starting the orchestrator"
 
-It will speak first. It will ask what you want to build, then walk you through
-git, Trello, the folder and stack questions, and the other agents. Keys and
-tokens go in your shell profile, typed by you, never in the chat.
-
-You can stop at any point. To come back, open a terminal and run:
-
-  cd $ORCHESTRATOR && claude
-
-Press Return to start."
+say "  It takes it from here. It will speak first. It will ask what you want to"
+say "  build, then walk you through git, Trello, the folder and stack questions,"
+say "  and the other agents. Keys and tokens go in your shell profile, typed by"
+say "  you, never in the chat."
+say ""
+say "  You can stop at any point. To come back, open a terminal and run:"
+say ""
+printf '    %scd %s && claude%s\n' "$C" "$ORCHESTRATOR" "$N" > /dev/tty
+say ""
+printf '  %sPress Return to start.%s ' "$B" "$N" > /dev/tty
 IFS= read -r _ < /dev/tty || true
 
 # exec replaces this process, so the EXIT trap will not fire.
