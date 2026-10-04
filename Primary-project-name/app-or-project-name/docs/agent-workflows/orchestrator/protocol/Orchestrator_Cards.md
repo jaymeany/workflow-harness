@@ -12,7 +12,7 @@ Research owns the evidence chain in the description; add comments after that.
 <what is true when this is done. Not the task, the result.>
 
 ## For
-<Research | Design | Dev>  ->  enters Next or Research. Research routes it on.
+<Research | Design | Dev>  ->  enters Next, Research or Design. Never Now.
 
 ## What exists already
 - <path> <what it gives you>
@@ -47,7 +47,7 @@ spans more than one worktree.
 
 | Column | Owner | Means |
 |---|---|---|
-| Next | Orchestrator | Framed, waiting for Research |
+| Next | Orchestrator | Framed, waiting to start |
 | Research | Research | Gathering evidence and sources, then routing the card to the team |
 | Design | Designer | Building the surface in Storybook |
 | Now | Dev | Building it into a route |

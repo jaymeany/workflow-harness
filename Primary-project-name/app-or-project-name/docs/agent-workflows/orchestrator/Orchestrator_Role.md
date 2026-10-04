@@ -57,10 +57,11 @@ card with enough framing that every role after it can start, then route it:
 ```
 Card  ->  Next       framed and waiting. When the user asks, tell Research it is there.
       ->  Research   ready to start now
+      ->  Design     the surface comes first
 ```
 
-**Research routes cards to the team.** You route cards to Next or Research. Any other column is a rare
-exception, and you discuss it with the user first. Never Now: every card bound for Dev goes through
+**Research routes cards to the team.** You route cards to Next, Research or Design. Any other column is
+a rare exception, and you discuss it with the user first. Never Now: every card bound for Dev goes through
 Research, and only Research moves a card to Now. You do not message Dev, Design or QA to start work.
 Instructions for the later roles go on the card.
 

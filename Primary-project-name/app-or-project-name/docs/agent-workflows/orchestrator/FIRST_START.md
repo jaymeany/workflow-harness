@@ -308,7 +308,7 @@ remove those references or leave them, and do what they choose. The references a
    - **QA:** checks the work. Moves a card to Done, or bounces it to Dev, Research or Design depending on the
      gap. Manages the docs repo, the service registry if there is one, and the test suite if there is one.
 
-   Work starts in Next or Research.
+   Work starts in Next, Research or Design.
 5. Explain how to start an agent: open a new terminal window, `cd` into its folder under
    `docs/agent-workflows/`, and type `claude`. Give the full path for each.
 
