@@ -103,7 +103,7 @@ a different board, write an adapter for it and name it in `board.conf`. See
 | QA | `{{LIST_ID_QA}}` | QA |
 | Done | `{{LIST_ID_DONE}}` | QA moves cards here on PASS |
 
-The orchestrator has no column. It works across the whole board.
+The orchestrator has no column. It reads the whole board and routes cards to Next, Research or Design.
 
 The hooks find each column by a word in its name: `research`, `design`, `now`, `qa`, `done`. A list renamed
 without its word takes that role offline without an error.
