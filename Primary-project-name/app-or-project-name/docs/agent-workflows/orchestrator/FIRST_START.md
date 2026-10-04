@@ -39,6 +39,9 @@ answer the user did not ask you to change.
 - **Offer to walk them through each setup task.** When they want help, look up the current steps on the
   web before you give them. Tools change their setup screens.
 - **Check what you can check yourself.** Run the command rather than asking the user.
+- **Detect first, then ask only for the gaps.** Before each step, check what is already in place: tools
+  installed, variables set, MCP servers loaded, repos and boards that exist. Say what you found, skip what is
+  done, and walk the user through only what is missing.
 - **Secrets never go in this chat.** API keys and tokens go in the user's shell profile, typed by them.
   Check that a variable is set with `[ -n "$NAME" ] && echo set || echo missing`. Never print a key or token.
 - **Write each answer into its file as you get it,** so a restart loses nothing.
@@ -173,6 +176,9 @@ first push as pending in the task list. It goes to Dev and QA once setup is done
 
 Trello is required. The agents pass work along a Trello board.
 
+**Check first.** If `TRELLO_API_KEY` and `TRELLO_TOKEN` (or `TRELLO_API_TOKEN`) are set and the
+`mcp__trello__*` tools are present, substeps 1 to 5 are done. Say so, and start at substep 6.
+
 1. **An account.** Help the user sign up at trello.com if they do not have one.
 2. **An API key and token.** Look up Trello's current steps on the web, then walk the user through them.
    Trello issues the key from its app admin page, and the token from a link next to the key. Tell the user
@@ -194,15 +200,36 @@ Trello is required. The agents pass work along a Trello board.
 5. **Restart.** The user quits Claude Code, opens a new terminal, starts the orchestrator again, and says
    they are continuing setup. Confirm the `mcp__trello__*` tools are present. Do not list every board on the
    account to test the connection; on an account with many boards the response is very large.
-6. **The API Developer ID Helper Power-Up**, by Sensum365. Help the user add it to their board. It shows the
-   board's ID, each card's API ID, and other board information, which the card names and the project
-   `CLAUDE.md` use.
-7. **The board.** Ask the user which board to use, by name: an existing board, or a new one they create in
-   Trello. If they have more than one board, ask; do not guess. Get the board's ID from the Power-Up, then
-   tell the user the board name and ID you will use before you make any other Trello call. Suggest these
-   column names, in this order: `Next`, `Research`, `Design`, `Now`, `QA`, `Done`. The user can choose other
-   names, as long as each role's column keeps its word: `research`, `design`, `now`, `qa`, `done`. The hooks
-   find columns by those words. The orchestrator has no column.
+6. **The API Developer ID Helper Power-Up**, by Sensum365. Optional. It shows the board's ID, each card's
+   API ID and other board information in Trello itself. You can read every ID through the `mcp__trello__`
+   tools, so the user needs it only if they want to see IDs in Trello. Offer it, and move on if they say no.
+7. **The board.** Ask the user which board to use. They can name it, or paste its URL, short link or ID. A
+   new board can be one they create in Trello, or one you create with the MCP. If they have more than one
+   board and give no name or link, ask; do not guess.
+
+   **Find the board's ID.** The `mcp__trello__` tools need the 24-character board ID. A short link fails:
+   it returns a 400 error.
+   - A 24-character hex ID is the ID. Use it as is.
+   - A URL like `trello.com/b/<short-link>/<name>` carries the short link, the eight characters after
+     `/b/`. The ID is not in the URL.
+   - For a short link or a name, call `list_workspaces`, then `list_boards_in_workspace` for each
+     workspace, and match on `shortLink` or `name`. Stop at the first match.
+   - A large workspace can return more than the tool can show. The tool then saves the result to a file.
+     Filter that file with `jq` for each board's `id`, `name` and `shortLink`. Do not read it whole.
+   - Do not list every board on the account.
+
+   **Confirm before any write.** Tell the user the board name, ID, workspace, visibility and member count,
+   and wait for a yes before you make any other Trello call.
+
+   **The lists.** Read the board's lists with `get_lists` first.
+   - **An empty board.** Suggest these list names, in this order: `Next`, `Research`, `Design`, `Now`,
+     `QA`, `Done`. `add_list_to_board` puts each new list at the far left and takes no position, so create
+     them in reverse order, `Done` first. Read the lists back and confirm the order.
+   - **A board with lists.** Map each role word to a list, and tell the user the map and any role word with
+     no list. Ask before you create, rename or archive a list.
+
+   The user can choose other names, as long as each role's list keeps its word: `research`, `design`,
+   `now`, `qa`, `done`. The hooks find lists by those words. The orchestrator has no list.
 8. **Labels.** The hooks match labels by color: green for Research complete, blue for Needs research, red
    for a QA FAIL, purple for QA complete, orange for a QA tracking card. The hooks create a missing label
    when they need it.
