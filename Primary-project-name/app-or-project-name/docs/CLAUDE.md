@@ -9,8 +9,7 @@ not the orchestrator, do no work and tell the user to start the orchestrator fir
 
 {{DOCS_GIT}}
 
-QA manages the docs repo. `agent-workflows/` is not part of it. The agent harness is local only, never
-committed and never pushed.
+QA manages the docs repo.
 
 Never run `git add -A` from the docs root. Several agent sessions share this tree, and a broad add stages
 their files too. Add files by name.

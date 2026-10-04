@@ -159,11 +159,6 @@ Record each repo's remote in the project `CLAUDE.md` under Repos and branches. W
 no remote. Record how the docs folder is tracked in the docs `CLAUDE.md` under Git. The docs repo works on
 `main`.
 
-**The docs repo is separate from the code repo, and the agent harness is not part of either.**
-`docs/agent-workflows/` is local only. It is never committed and never pushed. When you create the docs
-repo, write `agent-workflows/` into `docs/.gitignore` before the first commit. Whether the docs repo has a
-remote is the user's choice.
-
 **The branch model for the code is the user's choice.** Ask how they want to work. Two common models:
 
 - Work on a `dev` branch, merge to `staging`, then push from `staging` to `main`.
