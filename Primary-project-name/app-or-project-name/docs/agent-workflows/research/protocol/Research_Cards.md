@@ -60,6 +60,8 @@ A trailing worktree tag is **optional**, and only useful when a board spans more
 
 The handoff is **one action: attach the green "Research complete" label.** That single gated step advances the card from the Research column to "Now" for Dev.
 
+Before attaching the label, check every Depends on. A card in Now must be finishable by Dev alone. If a dependency is not Done, re-scope this card so it no longer needs that work. When the missing piece is a component another card is still building, the card ships a stand-in made from what already exists, and the other card replaces it later. Neither card waits. This is Research's call to make, not a question for the user. If re-scoping can't remove the dependency, the card does not go to Now. Tell the Orchestrator.
+
 1. Write the description so it qualifies: `## Research Complete` marker **plus** the required sections (Services Discovered / Files / Confidence), no blocker tags, no unresolved `## Open Questions`. Description and name writes have **no** side effects — edit and review freely; nothing advances.
 2. Attach the "Research complete" label (an `update_card_details` whose `labels` include the green label id, as its own call). `gate-research-complete.sh` validates the card fully qualifies and, on pass, advances it to "Now". If it doesn't qualify, the label attach is denied with the reason — fix the description and retry.
 
