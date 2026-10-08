@@ -38,10 +38,22 @@ board_available() {
 # ---------------------------------------------------------------------------
 
 # _trello_url <path> [query]
+#
+# The URL carries no credentials. A URL is a curl argument, and any user on
+# the computer can read a process's arguments with ps.
 _trello_url() {
-  local __tr_query="${2:-}"
-  printf 'https://api.trello.com/1%s?%skey=%s&token=%s' \
-    "$1" "${__tr_query:+${__tr_query}&}" "${TRELLO_API_KEY:-}" "${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
+  printf 'https://api.trello.com/1%s%s' "$1" "${2:+?$2}"
+}
+
+# _trello_auth
+#
+# Prints the Authorization header Trello accepts in place of the key and
+# token query parameters. Callers pipe it to curl, which reads it with
+# -H @-, so the key and token never appear in curl's arguments. printf is a
+# shell builtin, so it does not show in ps either.
+_trello_auth() {
+  printf 'Authorization: OAuth oauth_consumer_key="%s", oauth_token="%s"\n' \
+    "${TRELLO_API_KEY:-}" "${TRELLO_API_TOKEN:-${TRELLO_TOKEN:-}}"
 }
 
 # _trello_read <out var> <path> [query]
@@ -52,7 +64,7 @@ _trello_read() {
     BOARD_STATUS="nocreds"
     return 0
   fi
-  __tr_body="$(curl -s --max-time 5 "$(_trello_url "$2" "${3:-}")" 2>/dev/null)" || __tr_rc=$?
+  __tr_body="$(_trello_auth | curl -s --max-time 5 -H @- "$(_trello_url "$2" "${3:-}")" 2>/dev/null)" || __tr_rc=$?
   if [ "$__tr_rc" -ne 0 ]; then
     BOARD_STATUS="transport"
     return 0
@@ -78,10 +90,10 @@ _trello_send() {
     return 0
   fi
   if [ -n "$__tr_form" ]; then
-    __tr_body="$(curl -s --max-time 5 -X "$__tr_method" --data-urlencode "$__tr_form" \
+    __tr_body="$(_trello_auth | curl -s --max-time 5 -H @- -X "$__tr_method" --data-urlencode "$__tr_form" \
       "$(_trello_url "$__tr_path" "$__tr_query")" 2>/dev/null)" || __tr_rc=$?
   else
-    __tr_body="$(curl -s --max-time 5 -X "$__tr_method" \
+    __tr_body="$(_trello_auth | curl -s --max-time 5 -H @- -X "$__tr_method" \
       "$(_trello_url "$__tr_path" "$__tr_query")" 2>/dev/null)" || __tr_rc=$?
   fi
   if [ "$__tr_rc" -ne 0 ]; then
