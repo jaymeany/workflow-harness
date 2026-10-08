@@ -122,3 +122,25 @@ Before flagging, ask: **"Where is this documented?"**
 - **QA scripts and staging test plans** → `<project>-documentation/qa-qc/`
 
 ---
+
+## 17. Ready to test
+
+When the board is settled, tell the user it is ready to test. You own this. The orchestrator does no part of
+it.
+
+**When to check.** You move a card to Done and the QA column is now empty.
+
+**The check.** Read every column fresh from the board, never from memory. The board is settled when all of
+these hold:
+- Next, Design, Now and QA hold no work cards.
+- Research holds only tracking cards: a parent card marked `Children:`, or an orange tracking card.
+- Research and Dev are idle, checked with `ListAgents`, so no card is caught between columns.
+
+A card in Now with no Dev work blocks this forever. That is a card whose work landed elsewhere, so it has no
+diff. Name it to the user rather than wait on it.
+
+**If settled**, tell the user it is ready to test, and give the command to run each project the cards touched,
+from its section of the workspace `CLAUDE.md`. **If not**, do nothing and record nothing.
+
+**Milestones.** The user may name an earlier test point, such as one part of the build. Run the same check
+on the cards for that part.
