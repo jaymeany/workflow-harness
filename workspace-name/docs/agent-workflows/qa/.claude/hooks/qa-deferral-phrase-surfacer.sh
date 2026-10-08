@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # qa-deferral-phrase-surfacer.sh — Claude Code PreToolUse hook on
-# mcp__trello__add_comment.
+# mcp__trello__add_comment and mcp__trello__update_comment.
 #
 # Codifies QA_Decisions.md §8 "Findings Tracking":
 # QA review comments cannot ship deferral phrases ("non-blocking note",
@@ -28,7 +28,10 @@
 # next to the phrase rather than rely on a generic "Tracking Cards
 # Created: #N" footer that may or may not correspond to the deferral.
 #
-# Matcher in settings.json: "mcp__trello__add_comment"
+# Matcher in settings.json: "mcp__trello__(add_comment|update_comment)"
+#
+# Edits are checked too. A review posted clean and then edited to add a
+# deferral phrase would otherwise never be checked.
 #
 # Requires: jq
 #
@@ -53,7 +56,7 @@ source "$(dirname "$0")/../../../board/board.sh" 2>/dev/null || exit 0
 [[ "${BOARD_LOADED:-}" == "1" ]] || exit 0
 
 hook_read_action
-[[ "$HOOK_ACTION" == "comment" ]] || exit 0
+[[ "$HOOK_ACTION" == "comment" || "$HOOK_ACTION" == "comment_edit" ]] || exit 0
 
 text="$HOOK_TEXT"
 

@@ -63,8 +63,8 @@
         ]
       },
       {
-        "$comment": "Deferral-phrase surfacer (pre-comment). Denies mcp__trello__add_comment when the body starts with '## QA Review' (the \u00a79 template signature) AND contains a deferral phrase ('non-blocking note', 'minor gap', 'fold into next pass', 'out of scope', 'follow-on', 'future work observation', etc.) on a line that lacks a #<n> tracking-card citation. Codifies the QA memory rule that every finding gets a tracked card before the QA comment goes up.",
-        "matcher": "mcp__trello__add_comment",
+        "$comment": "Deferral-phrase surfacer (pre-comment). Denies mcp__trello__add_comment or mcp__trello__update_comment when the body starts with '## QA Review' (the \u00a79 template signature) AND contains a deferral phrase ('non-blocking note', 'minor gap', 'fold into next pass', 'out of scope', 'follow-on', 'future work observation', etc.) on a line that lacks a #<n> tracking-card citation. Codifies the QA memory rule that every finding gets a tracked card before the QA comment goes up.",
+        "matcher": "mcp__trello__(add_comment|update_comment)",
         "hooks": [
           {
             "type": "command",
