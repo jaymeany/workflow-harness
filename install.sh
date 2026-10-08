@@ -4,17 +4,17 @@
 #
 # It does four mechanical things and then gets out of the way: checks this
 # computer has what the hooks need, asks whether the folder it runs from is the
-# project, the workspace or neither, shows the folders it will set up and lets
+# workspace, one of its projects or neither, shows the folders it will set up and lets
 # the user change them, downloads the harness there, and starts the orchestrator.
 #
-# Renaming the two template folders is the one setup task that has to happen
-# while Claude Code is closed, because the agent sessions live inside them.
-# This script is that moment. It renames the folders on disk and nothing else:
+# Naming the workspace folder is the one setup task that has to happen while
+# Claude Code is closed, because the agent sessions live inside it.
+# This script is that moment. It places the folders on disk and nothing else:
 # every {{placeholder}} is left unfilled, so the orchestrator still runs
 # FIRST_START.md from step 1 and still records the names in the CLAUDE.md files.
 #
 # It never asks for or writes a key, a token or a password. Trello, git, the
-# MCP server, the code folder and the project'"'"'s stack are all settled in the
+# MCP server, the projects and their stacks are all settled in the
 # conversation with the orchestrator, after this script hands off.
 #
 # Run it from a file, not from a pipe:
@@ -26,8 +26,7 @@ set -euo pipefail
 
 REPO="jaymeany/workflow-harness"
 BRANCH="main"
-WORKSPACE_SRC="Primary-project-name"
-PROJECT_SRC="app-or-project-name"
+WORKSPACE_SRC="workspace-name"
 MIN_CLAUDE="2.1.224"
 
 # ------------------------------------------------------------------- styling
@@ -109,8 +108,8 @@ fi
 ok "Claude Code" "$claude_version"
 
 # --------------------------------------------------------------------- names
-# Renaming these folders is the one setup task that has to happen while Claude
-# Code is closed, because the orchestrator's session lives inside them.
+# Naming the workspace folder is the one setup task that has to happen while
+# Claude Code is closed, because the orchestrator's session lives inside it.
 section 2 "Where the harness goes"
 
 ask_name() {
@@ -137,7 +136,8 @@ HOME_DIR="$(cd "$HOME" && pwd -P)"
 # so pad by hand from a plain copy.
 row() {
   local prefix="$1" name="$2" note="$3" mark="${4:-}" plain pad
-  plain="${prefix//└──/xxx}$name"
+  plain="${prefix//└──/xxx}"
+  plain="${plain//├──/xxx}$name"
   pad=$(( 34 - ${#plain} ))
   [ "$pad" -ge 1 ] || pad=1
   printf '    %s%s%s%s%s%s%*s%s%s%s' "$D" "$prefix" "$N" "$B" "$name" "$N" "$pad" "" "$D" "$note" "$N" > /dev/tty
@@ -145,15 +145,19 @@ row() {
   printf '\n' > /dev/tty
 }
 
-# The hooks find the project three levels up from an agent's folder, and the
-# workspace one level above that. So the project must sit directly inside the
-# workspace. Any folders above the workspace are the user's own business.
-say "  The harness needs this shape. The project sits directly inside the workspace."
+# The hooks find the workspace three levels up from an agent's folder. So the
+# agents live in the workspace's docs/ folder, beside the projects, and one
+# team works on all of them. Any folders above the workspace are the user's
+# own business.
+say "  A workspace is a folder that holds one or more projects, such as the"
+say "  software of one company. The agents live in its docs/ folder, so they"
+say "  work on the projects in it. A project you add later goes in the same"
+say "  folder, and the same agents work on it."
 say ""
-row ""                    "workspace/"          "CLAUDE.md: rules for every project in it"
-row "└── "                "project/"            "CLAUDE.md, your code, docs/"
-row "    └── "            "docs/agent-workflows/" ""
-row "        └── "        "orchestrator/"       "and research, designer, dev, qa"
+row ""                    "workspace/"            "CLAUDE.md: the rules and every project"
+row "├── "                "project-one/"          "your code. One folder per project"
+row "├── "                "project-two/"          ""
+row "└── "                "docs/agent-workflows/" "orchestrator, research, designer, dev, qa"
 say ""
 dim "  Folders above the workspace can be anything."
 say ""
@@ -168,55 +172,51 @@ show_here() {
     dim "      nothing"
   fi
   say ""
-  say "  Choose p if this folder is the one project, empty or holding its code."
-  say "  Choose w if it holds your projects, or will."
+  say "  Choose w if this folder holds your projects, or will."
+  say "  Choose p if this folder is one project. The harness goes in the folder above."
   say "  Choose n to keep the harness in a new folder of its own, below this one."
 }
 
-# Sets LAYOUT to p, w or n. "Don't know" shows the folder and asks again.
+# Sets LAYOUT to w, p or n. "Don't know" shows the folder and asks again.
 ask_layout() {
   local answer=""
   say ""
   printf '  %sWhat is this folder?%s\n' "$B" "$N" > /dev/tty
   say ""
-  option p "the project. The harness goes in here."
-  option w "the workspace. A new project folder goes inside it."
-  option n "neither. A new workspace folder goes inside it, with the project inside that."
+  option w "the workspace. The harness goes in here, beside your projects."
+  option p "one project. The harness goes in the folder above, the workspace."
+  option n "neither. A new workspace folder goes inside it."
   option d "don't know"
   option q "stop"
   while true; do
-    ask "Choose p, w, n, d or q:"
+    ask "Choose w, p, n, d or q:"
     IFS= read -r answer < /dev/tty || die "No answer. Stopping."
     case "$answer" in
-      p|P) LAYOUT=p; return 0 ;;
       w|W) LAYOUT=w; return 0 ;;
+      p|P) LAYOUT=p; return 0 ;;
       n|N) LAYOUT=n; return 0 ;;
       d|D|"?") show_here ;;
       q|Q) die "Stopped. Nothing was written." ;;
-      *) warn "Choose p, w, n, d or q." ;;
+      *) warn "Choose w, p, n, d or q." ;;
     esac
   done
 }
 
-# Sets WS_DIR, PROJECT_DIR and PROJECT from LAYOUT, asking for names where the
-# layout makes a new folder. Returns 1, with the reason shown, if the plan
-# cannot work, so the user can choose again.
+# Sets WS_DIR from LAYOUT, asking for a name where the layout makes a new
+# folder. Returns 1, with the reason shown, if the plan cannot work, so the
+# user can choose again.
 plan() {
   case "$LAYOUT" in
-    p) PROJECT_DIR="$HERE"; WS_DIR="$(dirname "$HERE")"; PROJECT="$(basename "$HERE")" ;;
-    w) WS_DIR="$HERE"
-       PROJECT="$(ask_name "Project name" "${PROJECT:-project}")"
-       PROJECT_DIR="$WS_DIR/$PROJECT" ;;
+    w) WS_DIR="$HERE" ;;
+    p) WS_DIR="$(dirname "$HERE")" ;;
     n) WORKSPACE="$(ask_name "Workspace name" "${WORKSPACE:-workspace}")"
-       WS_DIR="$HERE/$WORKSPACE"
-       PROJECT="$(ask_name "Project name" "${PROJECT:-project}")"
-       PROJECT_DIR="$WS_DIR/$PROJECT" ;;
+       WS_DIR="$HERE/$WORKSPACE" ;;
   esac
 
   # A workspace CLAUDE.md in the home folder would load into every Claude
   # session on this computer, so the home folder cannot be the workspace.
-  if [ "$WS_DIR" = "$HOME_DIR" ] || [ "$PROJECT_DIR" = "$HOME_DIR" ]; then
-    warn "That makes the home folder the $( [ "$WS_DIR" = "$HOME_DIR" ] && echo workspace || echo project )." \
+  if [ "$WS_DIR" = "$HOME_DIR" ]; then
+    warn "That makes the home folder the workspace." \
       "Its CLAUDE.md would load into every Claude session on this computer." \
       "Choose another layout, or make a folder for the harness, change to it," \
       "and run this script again."
@@ -226,20 +226,16 @@ plan() {
     warn "$WS_DIR already exists." "Choose another workspace name, or change to it and choose w."
     return 1
   fi
-  if [ "$LAYOUT" != p ] && [ -e "$PROJECT_DIR" ]; then
-    warn "$PROJECT_DIR already exists." "Choose another project name, or change to it and choose p."
-    return 1
-  fi
-  if [ "$LAYOUT" = p ]; then
+  if [ "$LAYOUT" != n ]; then
     for name in CLAUDE.md docs; do
-      if [ -e "$PROJECT_DIR/$name" ]; then
-        warn "This folder already has $name, and the harness would write its own." \
+      if [ -e "$WS_DIR/$name" ]; then
+        warn "$WS_DIR already has $name, and the harness would write its own." \
           "Move it aside, or choose another layout."
         return 1
       fi
     done
-    if [ ! -e "$WS_DIR/CLAUDE.md" ] && [ ! -w "$WS_DIR" ]; then
-      warn "Cannot write the workspace CLAUDE.md to $WS_DIR." "Choose another layout."
+    if [ ! -w "$WS_DIR" ]; then
+      warn "Cannot write to $WS_DIR." "Choose another layout."
       return 1
     fi
   fi
@@ -247,22 +243,19 @@ plan() {
 }
 
 draw_plan() {
-  local ws_name ws_note proj_note ws_mark="" proj_mark=""
-  ws_name="$(basename "$WS_DIR")/"
+  local ws_note ws_mark="" projects="" p last
   if [ ! -e "$WS_DIR" ]; then
     ws_note="workspace. New folder, with CLAUDE.md."
-  elif [ -e "$WS_DIR/CLAUDE.md" ]; then
-    ws_note="workspace. Its CLAUDE.md is kept."
   else
     ws_note="workspace. CLAUDE.md is added."
   fi
-  if [ "$LAYOUT" = p ]; then
-    proj_note="project. CLAUDE.md and docs/ are added."
-    proj_mark="you are here"
-  else
-    proj_note="project. New folder."
-  fi
   [ "$LAYOUT" = w ] && ws_mark="you are here"
+
+  # The folders already in the workspace are shown as projects. Setup confirms
+  # each one with the user, so a folder that is not a project costs nothing.
+  if [ -d "$WS_DIR" ]; then
+    projects="$(find "$WS_DIR" -mindepth 1 -maxdepth 1 -type d ! -name '.*' -exec basename {} \; | sort | head -n 8)"
+  fi
 
   say ""
   printf '  %sThis is what will be set up.%s\n' "$B" "$N" > /dev/tty
@@ -270,19 +263,27 @@ draw_plan() {
   if [ "$LAYOUT" = n ]; then
     dim "  In $(dirname "$HERE")"
     say ""
-    row ""             "$(basename "$HERE")/"   ""                 "you are here"
-    row "└── "         "$ws_name"               "$ws_note"
-    row "    └── "     "$PROJECT/"              "$proj_note"
-    row "        └── " "docs/agent-workflows/"  "the five agents"
+    row ""         "$(basename "$HERE")/"     ""                "you are here"
+    row "└── "     "$(basename "$WS_DIR")/"   "$ws_note"
+    row "    └── " "docs/agent-workflows/"    "the five agents, for every project"
   else
     dim "  In $(dirname "$WS_DIR")"
     say ""
-    row ""             "$ws_name"               "$ws_note"         "$ws_mark"
-    row "└── "         "$PROJECT/"              "$proj_note"       "$proj_mark"
-    row "    └── "     "docs/agent-workflows/"  "the five agents"
+    row "" "$(basename "$WS_DIR")/" "$ws_note" "$ws_mark"
+    if [ -n "$projects" ]; then
+      while IFS= read -r p; do
+        if [ "$LAYOUT" = p ] && [ "$WS_DIR/$p" = "$HERE" ]; then
+          row "├── " "$p/" "project. Left as it is." "you are here"
+        else
+          row "├── " "$p/" "project. Left as it is."
+        fi
+      done <<< "$projects"
+    fi
+    row "└── " "docs/agent-workflows/" "the five agents, for every project"
   fi
   say ""
-  dim "  Anything already in these folders is left alone."
+  dim "  Anything already in these folders is left alone. The orchestrator"
+  dim "  confirms each project with you during setup."
 }
 
 # Returns 0 to go ahead, 1 to edit. q stops.
@@ -301,7 +302,7 @@ confirm_plan() {
   done
 }
 
-LAYOUT="" WS_DIR="" PROJECT_DIR="" PROJECT="" WORKSPACE=""
+LAYOUT="" WS_DIR="" WORKSPACE=""
 while true; do
   ask_layout
   plan || continue
@@ -324,48 +325,38 @@ mkdir -p "$tmp/unpacked"
 tar -xzf "$tmp/harness.tar.gz" -C "$tmp/unpacked" --strip-components=1 \
   || die "Could not unpack the harness."
 
-src="$tmp/unpacked/$WORKSPACE_SRC/$PROJECT_SRC"
-[ -f "$tmp/unpacked/$WORKSPACE_SRC/CLAUDE.md" ] && [ -d "$src/docs/agent-workflows/orchestrator" ] \
+src="$tmp/unpacked/$WORKSPACE_SRC"
+[ -f "$src/CLAUDE.md" ] && [ -d "$src/docs/agent-workflows/orchestrator" ] \
   || die "The download did not contain what was expected. Nothing was written."
 find "$src" -name '.DS_Store' -delete 2>/dev/null || true
 ok "downloaded" "github.com/$REPO"
 
-# The project folder may already exist and hold the user's own files. Check
-# every name first, so a clash stops before anything is written.
+# The workspace may already exist and hold the user's projects. Check every
+# name first, so a clash stops before anything is written.
 for entry in "$src"/* "$src"/.[!.]*; do
   [ -e "$entry" ] || continue
-  [ ! -e "$PROJECT_DIR/$(basename "$entry")" ] \
-    || die "$PROJECT_DIR/$(basename "$entry") already exists. Nothing was written."
+  [ ! -e "$WS_DIR/$(basename "$entry")" ] \
+    || die "$WS_DIR/$(basename "$entry") already exists. Nothing was written."
 done
 
-mkdir -p "$PROJECT_DIR"
+mkdir -p "$WS_DIR"
 for entry in "$src"/* "$src"/.[!.]*; do
   [ -e "$entry" ] || continue
-  mv "$entry" "$PROJECT_DIR/"
+  mv "$entry" "$WS_DIR/"
 done
-
-# The workspace may already hold a CLAUDE.md, from an earlier project or the
-# user's own. An existing one is kept. The LICENSE travels with a new one.
-if [ -e "$WS_DIR/CLAUDE.md" ]; then
-  ok "workspace" "$WS_DIR"
-  dim "                  its CLAUDE.md was already there and is kept"
-else
-  mv "$tmp/unpacked/$WORKSPACE_SRC/CLAUDE.md" "$WS_DIR/CLAUDE.md"
-  if [ ! -e "$WS_DIR/LICENSE" ] && [ -f "$tmp/unpacked/LICENSE" ]; then
-    mv "$tmp/unpacked/LICENSE" "$WS_DIR/LICENSE"
-  fi
-  ok "workspace" "$WS_DIR"
+if [ ! -e "$WS_DIR/LICENSE" ] && [ -f "$tmp/unpacked/LICENSE" ]; then
+  mv "$tmp/unpacked/LICENSE" "$WS_DIR/LICENSE"
 fi
 
-ORCHESTRATOR="$PROJECT_DIR/docs/agent-workflows/orchestrator"
-ok "project" "$PROJECT_DIR"
+ORCHESTRATOR="$WS_DIR/docs/agent-workflows/orchestrator"
+ok "workspace" "$WS_DIR"
 ok "orchestrator" "$ORCHESTRATOR"
 
 # -------------------------------------------------------------------- hand off
 section 4 "Starting the orchestrator"
 
 say "  It takes it from here. It will speak first. It will ask what you want to"
-say "  build, then walk you through git, Trello, the folder and stack questions,"
+say "  build, then walk you through git, Trello, your projects and their stacks,"
 say "  and the other agents. Keys and tokens go in your shell profile, typed by"
 say "  you, never in the chat."
 say ""

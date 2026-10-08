@@ -53,8 +53,13 @@ reach me through my site at [jaymeany.com](https://jaymeany.com) or GitHub profi
 ## Install
 
 The two lines above download the install script and run it. The script checks that your computer has what
-the hooks need, then asks what the folder you run it from is: the project, the workspace, or neither. A
-workspace holds projects. A project sits directly inside it and holds your code, its docs and the agents.
+the hooks need, then asks what the folder you run it from is: the workspace, one of its projects, or
+neither.
+
+A workspace is a folder that holds one or more projects. It could be a company, a client, or any body of
+work you want to keep together. The agents live in the workspace's `docs/` folder, so they work on the
+projects in that workspace. To add a project later, put its folder in the workspace and tell the
+orchestrator. The same agents work on it, with the same rules and the same board.
 
 Before it writes anything, it draws the folders it will set up, with your folder names and where you are.
 You can go ahead, change it, or stop. Then it downloads the harness there and starts the orchestrator. It
@@ -286,17 +291,18 @@ The harness fits your project, and it's built to be changed.
 - Your branch model. Work on a dev branch and merge to main, add a staging step, or use your own.
 - The roles you need. Start with some and add the rest later.
 - The tools that fit. Storybook, Playwright MCP and Axon are optional, and the orchestrator explains each.
-- Your names. Rename the workspace and project folders. Rename a Trello column and keep its word
+- Your names. Rename the workspace folder and name your project folders. Rename a Trello column and keep its word
   (`research`, `design`, `now`, `qa`, `done`), and the hooks still find it.
-- More than one project. Copy the project folder to add another.
+- More than one project. Add its folder to the workspace and tell the orchestrator. The same agents work
+  on it.
 
 ### Change how it works
 
 - The rules are files you can read. Roles and protocols are Markdown. Hooks are bash. Each hook entry in
   `settings.json` carries a comment, and each script's header explains what it checks and why.
 - Project facts live in one place. Claude Code reads every `CLAUDE.md` from a session's folder up, so each
-  role loads the workspace file, the project file, the docs file and its own. A board ID or branch rule is
-  written once and reaches every role.
+  role loads the workspace file, the docs file and its own. The workspace file lists every project. A
+  board ID or branch rule is written once and reaches every role.
 - Protocols grow by splitting. Claude Code caps what a startup hook can load. Each doc has its own loader,
   and a digest at startup warns when one crosses the cap.
 - New hooks are audited without changes. Hooks fail open when a tool or Trello variable is missing. An
@@ -345,7 +351,7 @@ The install script is the short path. Two others work:
 Either way you then start the orchestrator yourself:
 
 ```bash
-cd Primary-project-name/app-or-project-name/docs/agent-workflows/orchestrator
+cd workspace-name/docs/agent-workflows/orchestrator
 claude
 ```
 

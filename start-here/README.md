@@ -2,8 +2,9 @@
 
 ## What this is
 
-This harness runs a small team of Claude Code agents on a software project. Each agent is a separate Claude
-Code session with one job:
+This harness runs a small team of Claude Code agents on a workspace: one or more related software
+projects, such as the products of one company. One team works across all of them. Each agent is a separate
+Claude Code session with one job:
 
 | Agent | Job | Trello column |
 |---|---|---|
@@ -34,7 +35,7 @@ the work and the configuration happen in the terminal. The orchestrator explains
 - **Claude Code**, and a Claude plan that includes it.
 - **A kanban board.** The board is where the agents pass work. Trello is the one that ships, so you need a
   Trello account.
-- **Git and GitHub**, if your project uses them. They are not required.
+- **Git and GitHub**, if your projects use them. They are not required.
 
 The orchestrator walks you through setting up each of these.
 
@@ -46,7 +47,7 @@ Skip to it and answer its questions. The rest of this section is for a fork or a
 1. Open a terminal.
 2. Go to the orchestrator's folder:
 
-   `Primary-project-name/app-or-project-name/docs/agent-workflows/orchestrator`
+   `workspace-name/docs/agent-workflows/orchestrator`
 
    On a Mac, type `cd` and a space, drag that folder from Finder into the terminal window, and press Return.
 3. Type `claude` and press Return.
@@ -76,5 +77,12 @@ purpose is fine. Several parts of the harness are optional.
 
 ## The folders
 
-`Primary-project-name/` is your workspace. `app-or-project-name/` is your first project. The workspace
-`CLAUDE.md` explains why the folders are shaped this way and how to name new ones.
+`workspace-name/` is your workspace. Rename it for your company, a client, or whatever the work is.
+
+A workspace holds one or more projects, each in its own folder beside `docs/`. The agents live in
+`docs/agent-workflows/`, so they work on the projects in this workspace. That is why the folders are
+shaped this way.
+
+If you want to add a project with this workspace's agents, rules and board, put its folder here, beside
+the others, and tell the orchestrator. A project kept somewhere else does not get them. The workspace
+`CLAUDE.md` has the details.
