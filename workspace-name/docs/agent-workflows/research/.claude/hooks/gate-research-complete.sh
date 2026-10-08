@@ -68,9 +68,12 @@ if [[ "$HOOK_ACTION" == "update" ]]; then
     exit 0
   fi
 
+  # An update that sets the description, even to "", is checked against the
+  # text it writes. Testing for a non-empty value let an update clear the
+  # description and still pass on the old one.
   new_desc="$HOOK_DESCRIPTION"
   has_desc_update=0
-  [[ -n "$new_desc" ]] && has_desc_update=1
+  [[ "$HOOK_HAS_DESCRIPTION" == "true" ]] && has_desc_update=1
 
   # Look up the board's "Research complete" label id for this card's board.
   board_card_get card "$card_id"
